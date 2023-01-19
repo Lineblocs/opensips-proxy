@@ -45,8 +45,6 @@ yes|mv  $CFG_PATH.final $CFG_PATH
 
 OPENSIPS_ARGS="-FE"
 
-/usr/sbin/opensips help
-
 echo "Waiting for RTPproxies to be up before starting OpenSIPs.."
 
 sleep 30;
