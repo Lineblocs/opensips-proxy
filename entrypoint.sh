@@ -33,17 +33,15 @@ sed "s/DB_NAME/${DB_NAME}/g" $CFG_PATH.cop3 > $CFG_PATH.cop4
 
 
 # change API URLs
-sed "s/API_URL/${API_URL}/g" $CFG_PATH.cop4 > $CFG_PATH.final
-
-rm -rf $CFG_PATH.cop*
-yes|mv  $CFG_PATH.final $CFG_PATH
+sed "s/API_URL/${API_URL}/g" $CFG_PATH.cop4 > $CFG_PATH.cop5
 
 # Set the Lineblocs key 
-sed "s/LINEBLOCS_KEY/${LINEBLOCS_KEY}/g" $CFG_PATH > $CFG_PATH.cop
-cp $CFG_PATH.cop $CFG_PATH.final
+sed "s/LINEBLOCS_KEY/${LINEBLOCS_KEY}/g" $CFG_PATH.cop5 > $CFG_PATH.cop6
+cp $CFG_PATH.cop6 $CFG_PATH.final
 
 rm -rf $CFG_PATH.cop*
 yes|mv  $CFG_PATH.final $CFG_PATH
+
 
 OPENSIPS_ARGS="-FE"
 
