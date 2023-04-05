@@ -4,6 +4,7 @@ if [ "$CLOUD" != "" ]; then
    PROVIDER="-provider ${CLOUD}"
 fi
 
+APP="sampo"
 PRIVATE_IPV4=$(netdiscover -field privatev4 ${PROVIDER})
 #PRIVATE_IPV4="172.24.0.1"
 PUBLIC_IPV4=$(netdiscover -field publicv4 ${PROVIDER})
@@ -46,15 +47,15 @@ rm -rf $CFG_PATH.cop*
 yes|mv  $CFG_PATH.final $CFG_PATH
 
 OPENSIPS_ARGS="-FE"
+# run sampo API server in background
+echo "Starting sampo API server"
+socat -d TCP-LISTEN:1042,reuseaddr,fork,pf=ip4 \
+                    exec:/${APP}/${APP}.sh &
 
-/usr/sbin/opensips help
 
 echo "Waiting for RTPproxies to be up before starting OpenSIPs.."
 
 sleep 30;
-
-# run sampo API server in background
-socat TCP-LISTEN:1042,reuseaddr,pf=ip4,bind=127.0.0.1,fork system:sampo/sampo.sh &
 
 # start opensips server
 /usr/sbin/opensips ${OPENSIPS_ARGS}
