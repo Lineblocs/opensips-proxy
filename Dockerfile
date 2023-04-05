@@ -42,8 +42,10 @@ RUN cat /etc/opensips/opensips.cfg
 
 COPY ./configs/opensips.cfg /etc/opensips/opensips.cfg
 COPY entrypoint.sh /entrypoint.sh
+COPY sampo .
 #RUN sed -i "s/^\(socket\|listen\)=udp.*5060/\1=udp:eth0:5060/g" /etc/opensips/opensips.cfg
 
+EXPOSE 1042/tcp
 EXPOSE 5060/udp
 
 RUN chmod +x /entrypoint.sh
