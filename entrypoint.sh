@@ -53,4 +53,8 @@ echo "Waiting for RTPproxies to be up before starting OpenSIPs.."
 
 sleep 30;
 
+# run sampo API server in background
+socat TCP-LISTEN:1042,reuseaddr,pf=ip4,bind=127.0.0.1,fork system:sampo/sampo.sh &
+
+# start opensips server
 /usr/sbin/opensips ${OPENSIPS_ARGS}
