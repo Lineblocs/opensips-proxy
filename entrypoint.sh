@@ -28,7 +28,7 @@ yes|mv  $CFG_PATH.final $CFG_PATH
 
 # Change the DB info
 sed "s/DB_USER/${DB_USER}/g" $CFG_PATH > $CFG_PATH.cop
-sed "s/DB_PASSWORD/${DB_PASSWORD}/g" $CFG_PATH.cop > $CFG_PATH.cop2
+sed "s/DB_PASS/${DB_PASS}/g" $CFG_PATH.cop > $CFG_PATH.cop2
 sed "s/DB_HOST/${DB_HOST}/g" $CFG_PATH.cop2 > $CFG_PATH.cop3
 sed "s/DB_NAME/${DB_NAME}/g" $CFG_PATH.cop3 > $CFG_PATH.cop4
 
