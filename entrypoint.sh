@@ -47,6 +47,9 @@ cp $CFG_PATH.cop $CFG_PATH.final
 rm -rf $CFG_PATH.cop*
 yes|mv  $CFG_PATH.final $CFG_PATH
 
+echo "Final opensips.cfg contents are"
+cat $CFG_PATH
+
 OPENSIPS_ARGS="-FE"
 # run sampo API server in background
 echo "Starting sampo API server"
