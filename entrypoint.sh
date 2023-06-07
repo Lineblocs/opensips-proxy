@@ -8,8 +8,6 @@ APP="sampo"
 PRIVATE_IPV4=$(netdiscover -field privatev4 ${PROVIDER})
 #PRIVATE_IPV4="172.24.0.1"
 PUBLIC_IPV4=$(netdiscover -field publicv4 ${PROVIDER})
-API_URL=LB_API_URL
-
 CFG_PATH="/etc/opensips/opensips.cfg"
 
 if [[ -z "${RTPPROXY_IPV4}" ]]; then
