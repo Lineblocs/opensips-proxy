@@ -31,10 +31,11 @@ sed "s/DB_USER/${DB_USER}/g" $CFG_PATH > $CFG_PATH.cop
 sed "s/DB_PASS/${DB_PASS}/g" $CFG_PATH.cop > $CFG_PATH.cop2
 sed "s/DB_HOST/${DB_HOST}/g" $CFG_PATH.cop2 > $CFG_PATH.cop3
 sed "s/DB_NAME/${DB_NAME}/g" $CFG_PATH.cop3 > $CFG_PATH.cop4
+sed "s/DB_OPENSIPS/${DB_OPENSIPS}/g" $CFG_PATH.cop4 > $CFG_PATH.cop5
 
 
 # change API URLs
-sed "s/API_URL/${API_URL}/g" $CFG_PATH.cop4 > $CFG_PATH.final
+sed "s/API_URL/${API_URL}/g" $CFG_PATH.cop5 > $CFG_PATH.final
 
 rm -rf $CFG_PATH.cop*
 yes|mv  $CFG_PATH.final $CFG_PATH
