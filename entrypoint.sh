@@ -8,6 +8,13 @@ APP="sampo"
 PRIVATE_IPV4=$(netdiscover -field privatev4 ${PROVIDER})
 #PRIVATE_IPV4="172.24.0.1"
 PUBLIC_IPV4=$(netdiscover -field publicv4 ${PROVIDER})
+ADVERTIZED_IPV4="${PUBLIC_IPV4:-0.0.0.0}"
+
+# change variables for cloud providers that use NAT. e.g AWS
+if [ "$CLOUD" = "aws" ]; then
+   PUBLIC_IPV4="${PRIVATE_IPV4:-127.0.0.1}"
+fi
+
 # todo add https support
 API_SCHEME="http"
 DEPLOYMENT_DOMAIN="${DEPLOYMENT_DOMAIN:-example.org}"
