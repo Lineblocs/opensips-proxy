@@ -12,7 +12,8 @@ ADVERTIZED_IPV4="${PUBLIC_IPV4:-0.0.0.0}"
 
 # change variables for cloud providers that use NAT. e.g AWS
 if [ "$CLOUD" = "aws" ]; then
-   PUBLIC_IPV4="${PRIVATE_IPV4:-127.0.0.1}"
+   #PUBLIC_IPV4="${PRIVATE_IPV4:-127.0.0.1}"
+   PUBLIC_IPV4="0.0.0.0"
 fi
 
 # todo add https support
