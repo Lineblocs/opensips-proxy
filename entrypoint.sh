@@ -10,7 +10,13 @@ PRIVATE_IPV4=$(netdiscover -field privatev4 ${PROVIDER})
 PUBLIC_IPV4=$(netdiscover -field publicv4 ${PROVIDER})
 # todo add https support
 API_SCHEME="http"
+DEPLOYMENT_DOMAIN="${DEPLOYMENT_DOMAIN:-example.org}"
+LINEBLOCS_KEY="${LINEBLOCS_KEY:-123xyz}"
 API_URL="${API_SCHEME}://internals.${DEPLOYMENT_DOMAIN}"
+
+echo "Public ipv4: ${PUBLIC_IPV4}\r\n"
+echo "Private ipv4: ${PRIVATE_IPV4}\r\n"
+echo "API URL: ${API_URL}\r\n"
 
 CFG_PATH="/etc/opensips/opensips.cfg"
 
@@ -20,6 +26,7 @@ if [[ -z "${RTPPROXY_IPV4}" ]]; then
 fi
 
 
+echo "Updating configs with IPs\r\n"
 # Set the IPs
 sed "s/PRIVATE_IPV4/${PRIVATE_IPV4}/g" $CFG_PATH > $CFG_PATH.cop
 sed "s/PUBLIC_IPV4/${PUBLIC_IPV4}/g" $CFG_PATH.cop > $CFG_PATH.cop2
@@ -28,6 +35,14 @@ sed "s/RTPPROXY_IPV4/${RTPPROXY_IPV4}/g" $CFG_PATH.cop2 > $CFG_PATH.final
 rm -rf $CFG_PATH.cop*
 yes|mv  $CFG_PATH.final $CFG_PATH
 
+DB_USER="${DB_USER:-empty}"
+DB_PASS="${DB_PASS:-empty}"
+DB_HOST="${DB_HOST:-empty}"
+DB_NAME="${DB_NAME:-empty}"
+DB_OPENSIPS="${DB_OPENSIPS:-empty}"
+LINEBLOCS_KEY="${LINEBLOCS_KEY:-empty}"
+
+echo "Updating database variables\r\n"
 # Change the DB info
 sed "s/DB_USER/${DB_USER}/g" $CFG_PATH > $CFG_PATH.cop
 sed "s/DB_PASS/${DB_PASS}/g" $CFG_PATH.cop > $CFG_PATH.cop2
@@ -36,13 +51,17 @@ sed "s/DB_NAME/${DB_NAME}/g" $CFG_PATH.cop3 > $CFG_PATH.cop4
 sed "s/DB_OPENSIPS/${DB_OPENSIPS}/g" $CFG_PATH.cop4 > $CFG_PATH.cop5
 
 
+echo "Changing API URLs\r\n"
 # change API URLs
-sed "s/API_URL/${API_URL}/g" $CFG_PATH.cop5 > $CFG_PATH.final
+# use alternative delimiter for API_URL as it contains slashes
+# for example: sed "s~$var~replace~g" $file
+sed "s~API_URL~${API_URL}~g" $CFG_PATH.cop5 > $CFG_PATH.final
 
 rm -rf $CFG_PATH.cop*
 yes|mv  $CFG_PATH.final $CFG_PATH
 
 # Set the Lineblocs key 
+echo "Configuring Lineblocs key\r\n"
 sed "s/LINEBLOCS_KEY/${LINEBLOCS_KEY}/g" $CFG_PATH > $CFG_PATH.cop
 cp $CFG_PATH.cop $CFG_PATH.final
 
