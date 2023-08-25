@@ -15,7 +15,7 @@ ARG OPENSIPS_VERSION=3.1
 ARG OPENSIPS_BUILD=releases
 
 #install basic components
-RUN apt-get -y update -qq && apt-get -y install bash gnupg2 ca-certificates curl socat python gettext-base default-mysql-client 
+RUN apt-get -y update -qq && apt-get -y install bash gnupg2 ca-certificates curl socat python gettext-base default-mysql-client python3-pip
 
 #add keyserver, repository
 RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 049AD65B
@@ -47,6 +47,10 @@ RUN cat /etc/opensips/opensips.cfg
 
 COPY ./configs/opensips.cfg /etc/opensips/opensips.cfg
 COPY entrypoint.sh /entrypoint.sh
+
+# install some Python dependencies
+
+RUN python3 -m pip install pymysql
 
 # add sampo files
 

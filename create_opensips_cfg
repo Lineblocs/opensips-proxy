@@ -1,0 +1,88 @@
+#! /usr/bin/python3
+import pybars3
+import pymysql
+import pymysql.cursors
+
+def connect_to_db():
+    host = os.getenv("DB_HOST")
+    user = os.getenv("DB_USER")
+    password = os.getenv("DB_PASS")
+    db_name = os.getenv("DB_NAME")
+    db = pymysql.connect(host,user,password,db_name)
+    return db
+
+with open("./configs/opensips.cfg") as file:
+    source = file.read()
+    db = connect_to_db()
+    # populate database parameters
+    cursor = db.cursor()
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    cursor.execute("SELECT udp_support, udp_port, tcp_support, tcp_port FROM customizations")
+    data = cursor.fetchone()
+    print ("UDP support=" + str( data['udp_support'] ))
+    print ("TCP support=" + str( data['tcp_support'] ))
+    print ("TLS support=" + str( data['tls_support'] ))
+
+    udp_support = False 
+    tcp_support = False 
+    tls_support = False 
+    if data['udp_support'] == 1:
+        udp_support = True
+        udp_port = data['udp_port']
+    if data['tcp_support'] == 1:
+        tcp_support = True
+        tcp_port = data['tcp_port']
+    if data['tls_support'] == 1:
+        tls_support = True
+        tls_port = data['tls_port']
+        tls_ip_addr = ""
+        tls_port = ""
+        cert_dir = ""
+        tls_client_ip_addr = ""
+        tls_client_port = ""
+
+    # disconnect from server
+    db.close()
+
+
+
+
+    template = compiler.compile(source)
+    has_udp_support = False
+    udp_port = "5060"
+    replacements = {}
+    if has_udp_support:
+        replacements['udp_support'] = f"""#listen=udp:{public_ipv4}:{udp_port}"""
+        replacements['udp_load_module'] = f"""loadmodule "proto_udp.so""""
+    if has_tcp_support:
+        replacements['tcp_support'] = f"""#listen=tcp:{public_ipv4}:{tcp_port}"""
+        replacements['tcp_load_module'] = f"""loadmodule "proto_tcp.so"
+modparam("proto_tcp", "tcp_port", {tcp_port})
+        """
+    if has_tls_support:
+        replacements['tls_support'] = f"""#listen=tcp:{public_ipv4}:{tls_port}"""
+        replacements['tls_load_module'] = f"""loadmodule "proto_tls.so"
+modparam("proto_tls", "tls_port", {tls_port})
+modparam("proto_tls", "verify_cert", "0")
+modparam("proto_tls", "require_cert", "0")
+modparam("proto_tls", "tls_method", "TLSv1")
+modparam("proto_tls", "certificate", "{cert_dir}/rootCA/cacert.pem")           
+modparam("proto_tls", "private_key", "{cert_dir}/rootCA/private/cakey.pem")    
+modparam("proto_tls", "ca_list", "{cert_dir}/rootCA/cacert.pem")                
+modparam("proto_tls", "ca_dir", "{cert_dir}/rootCA/") 
+
+#first the  server domain
+modparam("proto_tls", "server_domain", "sv_dom={tls_ip_addr}:{tls_port}")           
+modparam("proto_tls", "certificate", "sv_dom:{cert_dir}/rootCA/cacert.pem")           
+modparam("proto_tls", "private_key", "sv_dom:{cert_dir}/rootCA/private/cakey.pem")    
+modparam("proto_tls", "ca_list", "sv_dom:{cert_dir}/rootCA/cacert.pem")  
+
+#and the client domain                                                               
+modparam("proto_tls", "client_domain", "cl_dom={tls_client_ip_addr}:{tls_client_port}")            
+modparam("proto_tls", "certificate", "cl_dom:{cert_dir}/user/user-cert.pem")         
+modparam("proto_tls", "private_key", "cl_dom:{cert_dir}/user/user-privkey.pem")       
+modparam("proto_tls", "ca_list", "cl_dom:{cert_dir}/user/user-calist.pem")  
+        """
+
+    output = template({'name': 'Will'}, helpers=helpers)
