@@ -15,7 +15,7 @@ ARG OPENSIPS_VERSION=3.1
 ARG OPENSIPS_BUILD=releases
 
 #install basic components
-RUN apt-get -y update -qq && apt-get -y install bash gnupg2 ca-certificates curl socat
+RUN apt-get -y update -qq && apt-get -y install bash gnupg2 ca-certificates curl socat python gettext-base default-mysql-client 
 
 #add keyserver, repository
 RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 049AD65B
