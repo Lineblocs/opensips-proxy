@@ -47,10 +47,13 @@ RUN cat /etc/opensips/opensips.cfg
 
 COPY ./configs/opensips.cfg /etc/opensips/opensips.cfg
 COPY entrypoint.sh /entrypoint.sh
+COPY create_opensips_cfg .
 
 # install some Python dependencies
 
-RUN python3 -m pip install pymysql
+RUN whereis python3
+
+RUN python3 -m pip install pymysql pybars3
 
 # add sampo files
 

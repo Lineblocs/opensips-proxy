@@ -1,7 +1,25 @@
 #! /usr/bin/python3
-import pybars3
 import pymysql
 import pymysql.cursors
+import os
+from pybars import Compiler
+
+
+
+def check_support(param):
+    if param == 1:
+        return True
+    return False
+
+def create_proto_support_code( public_ipv4, proto, proto_port, proto_autoscaling=False ):
+    if not proto_autoscaling:
+        return f"""listen={proto}:{public_ipv4}:{udp_port}"""
+
+    profile = f"PROFILE_{proto.upper()}"
+    workers = f"{proto.upper()}_workers="
+    return f"""listen={proto}:{public_ipv4}:{udp_port} use_auto_scaling_profile {profile}
+ 
+"""
 
 def connect_to_db():
     host = os.getenv("DB_HOST")
@@ -11,57 +29,81 @@ def connect_to_db():
     db = pymysql.connect(host,user,password,db_name)
     return db
 
-with open("./configs/opensips.cfg") as file:
-    source = file.read()
-    db = connect_to_db()
-    # populate database parameters
-    cursor = db.cursor()
-    cursor = db.cursor(pymysql.cursors.DictCursor)
+def get_db_params():
+    mock_data = True
+    if not mock_data:
+        db = connect_to_db()
+        # populate database parameters
+        cursor = db.cursor()
+        cursor = db.cursor(pymysql.cursors.DictCursor)
 
-    cursor.execute("SELECT udp_support, udp_port, tcp_support, tcp_port FROM customizations")
-    data = cursor.fetchone()
+        cursor.execute("SELECT udp_support, udp_port, udp_autoscaling, tcp_support, tcp_port, tcp_autoscaling, tls_support, tls_port FROM customizations")
+        data = cursor.fetchone()
+
+        # disconnect from server
+        db.close()
+        return data
+
+    data = {}
+    data['udp_support'] = 1
+    data['udp_port'] = '5060'
+    data['udp_autoscaling'] = 1
+    data['tcp_support'] = 0
+    data['tcp_port'] = '5080'
+    data['tcp_autoscaling'] = 1
+    data['tls_support'] = 0
+    data['tls_port'] = '5061'
+    return data
+
+    
+
+print("updating OpenSIPs config with database parameters")
+cfg_path = "/etc/opensips/opensips.cfg"
+cfg_path_new = "/etc/opensips/opensips.cfg.new"
+public_ipv4 = os.getenv('PUBLIC_IPV4')
+private_ipv4 = os.getenv('PRIVATE_IPV4')
+with open(cfg_path, "r+") as file:
+    source = file.read()
+print("source ", source)
+with open(cfg_path_new, "w") as file:
+    data = get_db_params()
     print ("UDP support=" + str( data['udp_support'] ))
+    print ("UDP auto scaling=" + str( data['udp_autoscaling'] ))
     print ("TCP support=" + str( data['tcp_support'] ))
+    print ("TCP auto scaling=" + str( data['tcp_autoscaling'] ))
     print ("TLS support=" + str( data['tls_support'] ))
 
-    udp_support = False 
-    tcp_support = False 
-    tls_support = False 
-    if data['udp_support'] == 1:
-        udp_support = True
-        udp_port = data['udp_port']
-    if data['tcp_support'] == 1:
-        tcp_support = True
-        tcp_port = data['tcp_port']
-    if data['tls_support'] == 1:
-        tls_support = True
-        tls_port = data['tls_port']
-        tls_ip_addr = ""
-        tls_port = ""
-        cert_dir = ""
-        tls_client_ip_addr = ""
-        tls_client_port = ""
+    udp_support = check_support( data['udp_support'] )
+    udp_autoscaling = check_support( data['udp_autoscaling'] )
+    udp_port = data['udp_port']
+    tcp_support = check_support( data['tcp_support'] )
+    tcp_autoscaling = check_support( data['tcp_autoscaling'] )
+    tcp_port = data['tcp_port']
+    tls_support = check_support( data['tls_support'] )
+    tls_port = data['tls_port']
+    tls_support = True
+    tls_ip_addr = ""
+    tls_port = ""
+    cert_dir = ""
+    tls_client_ip_addr = ""
+    tls_client_port = ""
 
-    # disconnect from server
-    db.close()
-
-
-
-
+    compiler = Compiler()
     template = compiler.compile(source)
-    has_udp_support = False
-    udp_port = "5060"
     replacements = {}
-    if has_udp_support:
-        replacements['udp_support'] = f"""#listen=udp:{public_ipv4}:{udp_port}"""
-        replacements['udp_load_module'] = f"""loadmodule "proto_udp.so""""
-    if has_tcp_support:
-        replacements['tcp_support'] = f"""#listen=tcp:{public_ipv4}:{tcp_port}"""
+    if data['udp_support']:
+        udp_code = create_proto_support_code( public_ipv4, 'udp', udp_port, udp_autoscaling )
+        replacements['udp_support'] = udp_code
+        replacements['udp_load_module'] = f"""loadmodule "proto_udp.so"
+modparam("proto_udp", "udp_port", {udp_port})"""
+    if data['tcp_support']:
+        tcp_code = create_proto_support_code( public_ipv4, 'tcp', tcp_port, tcp_autoscaling )
+        replacements['tcp_support'] = tcp_code
         replacements['tcp_load_module'] = f"""loadmodule "proto_tcp.so"
-modparam("proto_tcp", "tcp_port", {tcp_port})
-        """
-    if has_tls_support:
-        replacements['tls_support'] = f"""#listen=tcp:{public_ipv4}:{tls_port}"""
+modparam("proto_tcp", "tcp_port", {tcp_port})"""
+    if data['tls_support']:
+        tls_code = create_proto_support_code( public_ipv4, 'tls', tls_port, False)
+        replacements['tls_support'] = tls_code
         replacements['tls_load_module'] = f"""loadmodule "proto_tls.so"
 modparam("proto_tls", "tls_port", {tls_port})
 modparam("proto_tls", "verify_cert", "0")
@@ -82,7 +124,12 @@ modparam("proto_tls", "ca_list", "sv_dom:{cert_dir}/rootCA/cacert.pem")
 modparam("proto_tls", "client_domain", "cl_dom={tls_client_ip_addr}:{tls_client_port}")            
 modparam("proto_tls", "certificate", "cl_dom:{cert_dir}/user/user-cert.pem")         
 modparam("proto_tls", "private_key", "cl_dom:{cert_dir}/user/user-privkey.pem")       
-modparam("proto_tls", "ca_list", "cl_dom:{cert_dir}/user/user-calist.pem")  
-        """
+modparam("proto_tls", "ca_list", "cl_dom:{cert_dir}/user/user-calist.pem")"""
 
-    output = template({'name': 'Will'}, helpers=helpers)
+    output = template(replacements)
+    print("contents are now")
+    print(output)
+    print("writing new opensips.cfg file")
+    file.write( output )
+
+os.replace(cfg_path_new, cfg_path)

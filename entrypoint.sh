@@ -9,11 +9,9 @@ fi
 # it to make it available in subcommands (ie. envsubst).
 
 APP="sampo"
-#PRIVATE_IPV4=$(netdiscover -field privatev4 ${PROVIDER})
-export  PRIVATE_IPV4="172.24.0.1"
-#PUBLIC_IPV4=$(netdiscover -field publicv4 ${PROVIDER})
-export  PUBLIC_IPV4="10.9.0.5"
-ADVERTIZED_IPV4="${PUBLIC_IPV4:-0.0.0.0}"
+export PRIVATE_IPV4=$(netdiscover -field privatev4 ${PROVIDER})
+export PUBLIC_IPV4=$(netdiscover -field publicv4 ${PROVIDER})
+export ADVERTIZED_IPV4="${PUBLIC_IPV4:-0.0.0.0}"
 
 # change variables for cloud providers that use NAT. e.g AWS
 if [ "$CLOUD" = "aws" ]; then
@@ -49,9 +47,12 @@ cp $CFG_PATH $CFG_PATH.temp
 envsubst '$PRIVATE_IPV4 $PUBLIC_IPV4 $RTPPROXY_IPV4 $DB_USER $DB_PASS $DB_HOME $DB_NAME $DB_OPENSIPS $DB_USER $API_URL $LINEBLOCS_KEY' < $CFG_PATH.temp > $CFG_PATH
 # make database modifications with Python scripts
 echo "Adding OpenSIPs customization parameters (this may take some time)"
+tail -f /etc/*-release
 ./create_opensips_cfg
 
 rm -rf $CFG_PATH.temp
+
+exit;
 
 echo "Final opensips.cfg contents are"
 cat $CFG_PATH
