@@ -44,7 +44,7 @@ export DB_OPENSIPS="${DB_OPENSIPS:-empty}"
 
 
 cp $CFG_PATH $CFG_PATH.temp
-envsubst '$PRIVATE_IPV4 $PUBLIC_IPV4 $RTPPROXY_IPV4 $DB_USER $DB_PASS $DB_HOST $DB_NAME $DB_OPENSIPS $DB_USER $API_URL $LINEBLOCS_KEY' < $CFG_PATH.temp > $CFG_PATH
+envsubst '$PRIVATE_IPV4 $PUBLIC_IPV4 $RTPPROXY_IPV4 $DB_USER $DB_PASS $DB_HOST $DB_NAME $DB_OPENSIPS $DB_USER $API_URL $LINEBLOCS_KEY $DEPLOYMENT_DOMAIN' < $CFG_PATH.temp > $CFG_PATH
 # make database modifications with Python scripts
 echo "Adding OpenSIPs customization parameters (this may take some time)"
 ./create_opensips_cfg

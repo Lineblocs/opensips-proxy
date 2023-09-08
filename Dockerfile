@@ -15,7 +15,7 @@ ARG OPENSIPS_VERSION=3.1
 ARG OPENSIPS_BUILD=releases
 
 #install basic components
-RUN apt-get -y update -qq && apt-get -y install bash gnupg2 ca-certificates curl socat python gettext-base default-mysql-client python3-pip
+RUN apt-get -y update -qq && apt-get -y install bash gnupg2 ca-certificates curl socat python gettext-base default-mysql-client python3-pip libpcre3-dev
 
 #add keyserver, repository
 RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 049AD65B
@@ -31,9 +31,6 @@ RUN if [ ${OPENSIPS_CLI} = true ]; then \
 
 #ARG OPENSIPS_EXTRA_MODULES
 
-RUN apt-cache search "opensips-"
-
-RUN apt-cache search "opensips"
 RUN apt-get -y install opensips-mysql-module opensips-regex-module opensips-restclient-module opensips-http-modules opensips-json-module make
 
 RUN rm -rf /var/lib/apt/lists/*
