@@ -126,7 +126,7 @@ modparam("proto_tls", "certificate", "cl_dom:{cert_dir}/user/user-cert.pem")
 modparam("proto_tls", "private_key", "cl_dom:{cert_dir}/user/user-privkey.pem")       
 modparam("proto_tls", "ca_list", "cl_dom:{cert_dir}/user/user-calist.pem")"""
 
-    replacements['user_name']= "Lineblocs SIP router (powered by OpenSIPs)"
+    replacements['user_agent']= "Lineblocs SIP router (powered by OpenSIPs)"
 
     output = template(replacements)
     print("contents are now")
