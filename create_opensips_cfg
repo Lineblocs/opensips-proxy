@@ -37,7 +37,7 @@ def get_db_params():
         cursor = db.cursor()
         cursor = db.cursor(pymysql.cursors.DictCursor)
 
-        cursor.execute("SELECT udp_support, udp_port, udp_autoscaling, tcp_support, tcp_port, tcp_autoscaling, tls_support, tls_port FROM customizations")
+        cursor.execute("SELECT opensips_config, udp_support, udp_port, udp_autoscaling, tcp_support, tcp_port, tcp_autoscaling, tls_support, tls_port FROM customizations")
         data = cursor.fetchone()
 
         # disconnect from server
@@ -45,6 +45,7 @@ def get_db_params():
         return data
 
     data = {}
+    data['opensips_config'] = open("./mock-data/opensips.cfg", "r+").read()
     data['udp_support'] = 1
     data['udp_port'] = '5060'
     data['udp_autoscaling'] = 1
@@ -62,8 +63,9 @@ cfg_path = "/etc/opensips/opensips.cfg"
 cfg_path_new = "/etc/opensips/opensips.cfg.new"
 public_ipv4 = os.getenv('PUBLIC_IPV4')
 private_ipv4 = os.getenv('PRIVATE_IPV4')
-with open(cfg_path, "r+") as file:
-    source = file.read()
+data = get_db_params()
+source = data['opensips_config']
+
 print("source ", source)
 with open(cfg_path_new, "w") as file:
     data = get_db_params()
