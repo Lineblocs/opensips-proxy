@@ -40,9 +40,7 @@ RUN chmod +x /usr/bin/netdiscover
 
 # Copy configs
 
-RUN cat /etc/opensips/opensips.cfg
-
-COPY ./configs/opensips.cfg /etc/opensips/opensips.cfg
+COPY ./configs/opensips.cfg.template /tmp/opensips.cfg
 COPY entrypoint.sh /entrypoint.sh
 COPY create_opensips_cfg .
 

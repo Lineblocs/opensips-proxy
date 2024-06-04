@@ -40,7 +40,7 @@ auto_aliases=no
 timer_workers = 2 use_auto_scaling_profile PROFILE_TIMER
 
 # UDP support
-#listen=udp:$PUBLIC_IPV4:5060
+#listen=udp:{{{public_ipv4}}}:5060
 {{{udp_support}}}
 
 # TCP support
@@ -51,10 +51,10 @@ timer_workers = 2 use_auto_scaling_profile PROFILE_TIMER
 #listen=tcp:127.0.0.1:5080
 {{{tcp_support}}}
 
-listen=hep_udp:$PUBLIC_IPV4:9060
+listen=hep_udp:{{{public_ipv4}}}:9060
 
-#socket=udp:$PRIVATE_IPV4:5060   # CUSTOMIZE ME
-alias=udp:$PUBLIC_IPV4:5060
+#socket=udp:{{{private_ipv4}}}:5060   # CUSTOMIZE ME
+alias=udp:{{{public_ipv4}}}:5060
 advertised_address="ADVERTIZED_IPV4"
 
 
@@ -85,14 +85,14 @@ loadmodule "auth_db.so"
 # ----- auth_db params -----
 modparam("auth_db", "calculate_ha1", yes)
 modparam("auth_db", "password_column", "password")
-modparam("auth_db", "db_url","mysql://$DB_USER:$DB_PASS@$DB_HOST/$DB_OPENSIPS")
+modparam("auth_db", "db_url","mysql://{{{db_user}}}:{{{db_pass}}}@{{{db_host}}}/{{{db_opensips}}}")
 modparam("auth_db", "load_credentials", "")
 modparam("auth_db", "use_domain", 1)
 
 
 loadmodule "domain.so"
 # ----- domain params -----
-modparam("domain", "db_url", "mysql://$DB_USER:$DB_PASS@$DB_HOST/$DB_OPENSIPS")
+modparam("domain", "db_url", "mysql://{{{db_user}}}:{{{db_pass}}}@{{{db_host}}}/{{{db_opensips}}}")
 modparam("domain", "db_mode", 0)   # Use caching
 
 
@@ -110,7 +110,7 @@ loadmodule "sipmsgops.so"
 
 loadmodule "avpops.so"
 # default URL
-modparam("avpops","db_url","mysql://$DB_USER:$DB_PASS@$DB_HOST/$DB_OPENSIPS")
+modparam("avpops","db_url","mysql://{{{db_user}}}:{{{db_pass}}}@{{{db_host}}}/{{{db_opensips}}}")
 
 
 #### FIFO Management Interface
@@ -123,7 +123,7 @@ modparam("mi_fifo", "fifo_mode", 0666)
 loadmodule "usrloc.so"
 modparam("usrloc", "nat_bflag", "NAT")
 modparam("usrloc", "db_mode",   0)
-modparam("usrloc", "db_url", "mysql://$DB_USER:$DB_PASS@$DB_HOST/$DB_OPENSIPS")
+modparam("usrloc", "db_url", "mysql://{{{db_user}}}:{{{db_pass}}}@{{{db_host}}}/{{{db_opensips}}}")
 
 #### REGISTRAR module
 loadmodule "registrar.so"
@@ -137,12 +137,12 @@ loadmodule "nathelper.so"
 modparam("nathelper", "ping_nated_only", 1) # Ping only clients behind NAT
 modparam("nathelper", "sipping_bflag", "8")
 modparam("nathelper", "received_avp", "$avp(received)")
-modparam("nathelper", "force_socket", "udp:$PRIVATE_IPV4:7722")
+modparam("nathelper", "force_socket", "udp:{{{private_ipv4}}}:7722")
 
 loadmodule "rtpproxy.so"
 # RTPProxy setup
-#modparam("rtpproxy", "rtpproxy_sock", "udp:$RTPPROXY_IPV4:7722")
-modparam("rtpproxy", "db_url", "mysql://$DB_USER:$DB_PASS@$DB_HOST/$DB_OPENSIPS")
+#modparam("rtpproxy", "rtpproxy_sock", "udp:{{{rtpproxy_ipv4}}}:7722")
+modparam("rtpproxy", "db_url", "mysql://{{{db_user}}}:{{{db_pass}}}@{{{db_host}}}/{{{db_opensips}}}")
 modparam("rtpproxy", "db_table", "rtpproxy_sockets")
 modparam("rtpproxy", "rtpp_socket_col", "rtpproxy_sock")
 modparam("rtpproxy", "rtpproxy_disable_tout", 20)
@@ -193,7 +193,7 @@ loadmodule "options.so"
 
 ### CHANGEME mysql uri here if you do sip_capture()
 loadmodule "sipcapture.so"
-modparam("sipcapture", "db_url", "mysql://$DB_USER:$DB_PASS@$DB_HOST/homer_data")
+modparam("sipcapture", "db_url", "mysql://{{{db_user}}}:{{{db_pass}}}@{{{db_host}}}/{{{db_homer}}}")
 modparam("sipcapture", "capture_on", 0)
 modparam("sipcapture", "hep_capture_on", 0)
 modparam("sipcapture", "hep_route", "CAPTURE_HEP_ROUTE")
@@ -246,7 +246,7 @@ route{
 		{
 			if (is_method("INVITE")) 
 			{
-                record_route_preset("$PUBLIC_IPV4");
+                record_route_preset("{{{public_ipv4}}}");
 				record_route();
 			}
 
@@ -336,18 +336,18 @@ route{
 	if (is_method("REGISTER"))
 	{
 		# check if its a hosted trunk or SIP device
-		# we can verify this by checking if the domain ends in pstn.DEPLOYMENT_DOMAIN
-		if (pcre_match("$td", "pstn\.$DEPLOYMENT_DOMAIN")) {
+		# we can verify this by checking if the domain ends in pstn.{{{deployment_domain}}}
+		if (pcre_match("$td", "pstn\.{{{deployment_domain}}}")) {
     		xlog("L_INFO", "Hosted trunk was matched\n");
 			$var(query) = "domain=" + $fd + "&ip=" + $si + "&addr=" + $si + "&todomain=" + $td + "&fromuser=" + $fU + "&touser=" + $tU;
 			$var(reg) = "/\+/%2B/g";
-			async(rest_get("$API_URL/user/hostedSIPTrunkLookup?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), HOSTED_TRUNK_REGISTER);
+			async(rest_get("{{{api_url}}}/user/hostedSIPTrunkLookup?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), HOSTED_TRUNK_REGISTER);
 			exit;
 		} else {
 			$var(query) = "domain=" + $fd + "&ip=" + $si + "&addr=" + $si;
 			$var(reg) = "/\+/%2B/g";
 			xlog("REG calling API..");
-			async(rest_get("$API_URL/user/ipWhitelistLookup?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), REGISTER);
+			async(rest_get("{{{api_url}}}/user/ipWhitelistLookup?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), REGISTER);
 			exit;
 		}
 	}
@@ -361,7 +361,7 @@ route{
 
 	xlog("RECEIVED KEY: $hdr(X-LineBlocs-Key)\r\n");
 	xlog("RECEIVED AGENT: $hdr(User-Agent)\r\n");
-	if ($hdr(X-LineBlocs-Key) == "$LINEBLOCS_KEY") 
+	if ($hdr(X-LineBlocs-Key) == "{{{lineblocs_key}}}") 
 	{ #internal asterisk
 		remove_hf("X-LineBlocs-Key");
 		xlog("received media server request from $si\r\n");
@@ -375,17 +375,17 @@ route{
 				if ($hdr(X-LineBlocs-Route-Type) == "extension")
 				{
 					xlog("routing to extension...\r\n");
-					async(rest_get("$API_URL/user/incomingMediaServerValidation?source=$si&addr=$si", $var(body), $var(ct), $var(rcode)), INCOMING_MS_VALIDATE_1_ROUTE);
+					async(rest_get("{{{api_url}}}/user/incomingMediaServerValidation?source=$si&addr=$si", $var(body), $var(ct), $var(rcode)), INCOMING_MS_VALIDATE_1_ROUTE);
 					#route(RELAY);
 					exit;
 				}
 
 				if ($hdr(X-LineBlocs-Route-Type) == "pstn")
 				{
-					#xlog("L_NOTICE", "calling URL: $API_URL/user/getPSTNProviderIP?from=$fU&to=$tU&domain=$hdr(X-LineBlocs-Domain)");
+					#xlog("L_NOTICE", "calling URL: {{{api_url}}}/user/getPSTNProviderIP?from=$fU&to=$tU&domain=$hdr(X-LineBlocs-Domain)");
 
 					xlog("routing to pstn...\r\n");
-					async(rest_get("$API_URL/user/incomingMediaServerValidation?source=$si&addr=$si", $var(body), $var(ct), $var(rcode)), INCOMING_MS_VALIDATE_2_ROUTE);
+					async(rest_get("{{{api_url}}}/user/incomingMediaServerValidation?source=$si&addr=$si", $var(body), $var(ct), $var(rcode)), INCOMING_MS_VALIDATE_2_ROUTE);
 					exit;
 				}
 			}
@@ -407,18 +407,18 @@ route{
 					{ ## call to PSTN
 						$var(query) = "number=" + $tU + "&domain=" + $fd + "&addr=" + $si;
 						$var(reg) = "/\+/%2B/g";
-						async(rest_get("$API_URL/user/verifyCallerByDomain?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), VERIFY_CALLER_ROUTE);
+						async(rest_get("{{{api_url}}}/user/verifyCallerByDomain?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), VERIFY_CALLER_ROUTE);
 						exit;
 					} else if ($rU=~"^[0-9]{1,5}$") { ## call to another end device
 						$var(query) = "username=" + $fu + "&domain=" + $fd + "&routerip=" +  $socket_in(ip) + "&addr=" + $si;
 						$var(reg) = "/\+/%2B/g";
-						async(rest_get("$API_URL/user/getUserAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), ENDPOINT_QUERY_ROUTE);
+						async(rest_get("{{{api_url}}}/user/getUserAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), ENDPOINT_QUERY_ROUTE);
 						exit;	
 					}
 				} else if ($rU=~"^\*[1-9]+") { ## media service call
 					$var(query) = "username=" + $fu + "&domain=" + $fd + "&routerip=" +  $socket_in(ip) + "&addr=" + $si;
 					$var(reg) = "/\+/%2B/g";
-					async(rest_get("$API_URL/user/getUserAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), MEDIASERVICE_QUERY_ROUTE);
+					async(rest_get("{{{api_url}}}/user/getUserAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), MEDIASERVICE_QUERY_ROUTE);
 					exit;
 				}
 		}
@@ -438,7 +438,7 @@ route{
 			$var(reg) = "/\+/%2B/g";
 
 			rest_append_hf("X-Lineblocs-Carrier-Auth: CARRIER_KEY");
-			async(rest_get("$API_URL/user/incomingDIDValidation?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), INCOMING_VALIDATION);
+			async(rest_get("{{{api_url}}}/user/incomingDIDValidation?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), INCOMING_VALIDATION);
 			exit;
 		}
 	}
@@ -481,7 +481,7 @@ route[RELAY] {
 			{
 				rtpproxy_offer("froc", "$hdr(X-LineBlocs-RTPProxy)");
 			} else {
-				rtpproxy_offer("froc", "$PUBLIC_IPV4");
+				rtpproxy_offer("froc", "{{{public_ipv4}}}");
 			}
 		}
 	
@@ -536,7 +536,7 @@ route[RELAY_MS_TO_PSTN] {
 		if(has_body("application/sdp"))
 		{
 			#xlog("we have sdp on this $rm");
-			rtpproxy_offer("froc", "$PUBLIC_IPV4");
+			rtpproxy_offer("froc", "{{{public_ipv4}}}");
 		}
 	
 		if (lookup("location","m")) 
@@ -586,7 +586,7 @@ route[INCOMING_VALIDATION] {
 		$var(reg) = "/\+/%2B/g";
 
 		rest_append_hf("X-Lineblocs-Carrier-Auth: CARRIER_KEY");
-		async(rest_get("$API_URL/user/incomingTrunkValidation?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), TRUNK_VALIDATION);
+		async(rest_get("{{{api_url}}}/user/incomingTrunkValidation?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), TRUNK_VALIDATION);
 		exit;
 
 		send_reply(500, "PSTN Routing Failed #1");
@@ -600,21 +600,21 @@ route[INCOMING_VALIDATION] {
 			rest_append_hf("X-Lineblocs-Carrier-Auth: CARRIER_KEY");
 			$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
 			$var(reg) = "/\+/%2B/g";
-			async(rest_get("$API_URL/user/processSIPTrunkCall?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), USER_SIP_TRUNK);
+			async(rest_get("{{{api_url}}}/user/processSIPTrunkCall?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), USER_SIP_TRUNK);
         break;
         case "hosted":
 			append_hf("X-LineBlocs-Fulfill-Type: hosted\r\n");
 			rest_append_hf("X-Lineblocs-Carrier-Auth: CARRIER_KEY");
 			$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
 			$var(reg) = "/\+/%2B/g";
-			async(rest_get("$API_URL/user/getDIDAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), DID_ASSIGNED);
+			async(rest_get("{{{api_url}}}/user/getDIDAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), DID_ASSIGNED);
         break;
         case "byo_carrier":
 			append_hf("X-LineBlocs-Fulfill-Type: byo_carrier\r\n");
 			rest_append_hf("X-Lineblocs-Carrier-Auth: CARRIER_KEY");
 			$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
 			$var(reg) = "/\+/%2B/g";
-			async(rest_get("$API_URL/user/getDIDAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), DID_ASSIGNED);
+			async(rest_get("{{{api_url}}}/user/getDIDAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), DID_ASSIGNED);
         break;
 	}
 }
@@ -631,7 +631,7 @@ route[TRUNK_VALIDATION] {
 	rest_append_hf("X-Lineblocs-Carrier-Auth: CARRIER_KEY");
 	$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
 	$var(reg) = "/\+/%2B/g";
-	async(rest_get("$API_URL/user/getTrunkAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), TRUNK_ASSIGNED);
+	async(rest_get("{{{api_url}}}/user/getTrunkAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), TRUNK_ASSIGNED);
 }
 
 
@@ -646,7 +646,7 @@ route[USER_SIP_TRUNK] {
 	append_hf("X-Lineblocs-User-SIP-Trunk-Addr: $var(body)\r\n");
 	$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
 	$var(reg) = "/\+/%2B/g";
-	async(rest_get("$API_URL/user/getDIDAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), DID_ASSIGNED);
+	async(rest_get("{{{api_url}}}/user/getDIDAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), DID_ASSIGNED);
 }
 
 route[INCOMING_VALIDATION_2] {
@@ -659,7 +659,7 @@ route[INCOMING_VALIDATION_2] {
 	rest_append_hf("X-Lineblocs-Carrier-Auth: CARRIER_KEY");
 	$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
 	$var(reg) = "/\+/%2B/g";
-	async(rest_get("$API_URL/user/getDIDAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), DID_ASSIGNED);
+	async(rest_get("{{{api_url}}}/user/getDIDAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), DID_ASSIGNED);
 }
 
 route[DID_ASSIGNED] {
@@ -673,7 +673,7 @@ route[DID_ASSIGNED] {
 	rest_append_hf("X-Lineblocs-Carrier-Auth: CARRIER_KEY");
 	$var(query) = "did=" + $tU + "&addr=" + $si;
 	$var(reg) = "/\+/%2B/g";
-	async(rest_get("$API_URL/user/getDIDAcceptOption?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), CALL_ACTION);
+	async(rest_get("{{{api_url}}}/user/getDIDAcceptOption?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), CALL_ACTION);
 }
 
 route[TRUNK_ASSIGNED] {
@@ -685,7 +685,7 @@ route[TRUNK_ASSIGNED] {
 
 	$ru = "sip:" + $rU + "@" + $var(body);
 	#rest_append_hf("X-Lineblocs-Carrier-Auth: CARRIER_KEY");
-	append_hf("X-LineBlocs-Key: $LINEBLOCS_KEY\r\n");
+	append_hf("X-LineBlocs-Key: {{{lineblocs_key}}}\r\n");
 	append_hf("X-LineBlocs-Accept-Call-Type: voice\r\n");
 	append_hf("X-LineBlocs-Direction: outgoing-proxy-trunk\r\n");
 	append_hf("X-Lineblocs-Trunk-SourceIP: $fd\r\n");
@@ -699,14 +699,14 @@ route[CALL_ACTION] {
 		exit;
 	}
 
-	append_hf("X-LineBlocs-Key: $LINEBLOCS_KEY\r\n");
+	append_hf("X-LineBlocs-Key: {{{lineblocs_key}}}\r\n");
 	switch($var(body))
 	{
 		case "accept-call":
 			log("accept-call action is set..");
 			append_hf("X-LineBlocs-Accept-Call-Type: voice\r\n");
 			append_hf("X-LineBlocs-Direction: incoming-proxy\r\n");
-			async(rest_get("$API_URL/getBestRTPProxy", $var(body), $var(ct), $var(rcode)), RTPPROXY_SELECTION);
+			async(rest_get("{{{api_url}}}/getBestRTPProxy", $var(body), $var(ct), $var(rcode)), RTPPROXY_SELECTION);
 			#route(RELAY);
 		break;
 		case "accept-fax":
@@ -778,7 +778,7 @@ route[REGISTER] {
 
 	$var(body) = "domain=" + $fd + "&ip=" + $si" + "&user=" + $fU + "&contact=" + $hdr(Contact) + "&expires=" + $hdr(Expires) + "&addr=" + $si;
 	$var(reg) = "/\+/%2B/g";
-	async(rest_post("$API_URL/user/storeRegistration", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), REGISTER_STORE);
+	async(rest_post("{{{api_url}}}/user/storeRegistration", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), REGISTER_STORE);
 
 	exit;
 }
@@ -872,7 +872,7 @@ route[INCOMING_MS_VALIDATE_2_ROUTE] {
 
 	$var(body) = "callid=" + $hdr(Call-ID) + "&apiid=" + $hdr(X-LineBlocs-API-CallId) + "&source=" + $si;
 	$var(reg) = "/\+/%2B/g";
-	async(rest_post("$API_URL/call/setSIPCallID", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), MS_PSTN_START_ROUTE);
+	async(rest_post("{{{api_url}}}/call/setSIPCallID", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), MS_PSTN_START_ROUTE);
 	exit;
 }
 
@@ -885,7 +885,7 @@ route[MS_PSTN_START_ROUTE] {
 
 	$var(query) = "from=" + $fU + "&to=" + $tU + "&domain=" + $hdr(X-LineBlocs-Domain) + "&source=" + $si + "&addr=" + $si;
 	$var(reg) = "/\+/%2B/g";
-	async(rest_get("$API_URL/user/getPSTNProviderIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), MS_PSTN_PROCESS_ROUTE);
+	async(rest_get("{{{api_url}}}/user/getPSTNProviderIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), MS_PSTN_PROCESS_ROUTE);
 	exit;
 }
 
@@ -905,7 +905,7 @@ route[MS_PSTN_PROCESS_ROUTE] {
 	$var(reg) = "/\+/%2B/g";
 
 	# tell API what provider is being used...
-	async(rest_post("$API_URL/call/setProviderByIP", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), MS_PSTN_AND_FINALIZE_ROUTING);
+	async(rest_post("{{{api_url}}}/call/setProviderByIP", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), MS_PSTN_AND_FINALIZE_ROUTING);
 	exit;
 }
 
@@ -927,7 +927,7 @@ route[VERIFY_CALLER_ROUTE] {
 	{
 		$var(body) = "domain=" + $fd + "&type=verify-callerid-failed" + "&addr=" + $si;
 		$var(reg) = "/\+/%2B/g";
-		async(rest_post("$API_URL/debugger/createLogSimple", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), VERIFY_FORBIDDEN);
+		async(rest_post("{{{api_url}}}/debugger/createLogSimple", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), VERIFY_FORBIDDEN);
 		send_reply(403, "Forbidden");
 		exit;
 	}
@@ -935,7 +935,7 @@ route[VERIFY_CALLER_ROUTE] {
 	xlog("making call now..");
 	$var(query) = "username=" + $fu + "&domain=" + $fd + "&routerip=" +  $socket_in(ip) + "&addr=" + $si;
 	$var(reg) = "/\+/%2B/g";
-	async(rest_get("$API_URL/user/getUserAssignedIP?username=$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), PSTN_QUERY_ROUTE);
+	async(rest_get("{{{api_url}}}/user/getUserAssignedIP?username=$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), PSTN_QUERY_ROUTE);
 }
 
 route[VERIFY_FORBIDDEN] {
@@ -946,7 +946,7 @@ route[VERIFY_FORBIDDEN] {
 route[PSTN_QUERY_ROUTE] {
 	xlog("pstn query result $(var(body))\r\n");
 	$ru = "sip:" + $rU + "@" + $var(body);
-	append_hf("X-LineBlocs-Key: $LINEBLOCS_KEY\r\n");
+	append_hf("X-LineBlocs-Key: {{{lineblocs_key}}}\r\n");
 	append_hf("X-LineBlocs-Call-Type: pstn\r\n");
 	append_hf("X-LineBlocs-Direction: outgoing-proxy\r\n");
 	uac_replace_from("", "sip:$fU@$fd");
@@ -975,7 +975,7 @@ route[PSTN_QUERY_ROUTE] {
 		if(has_body("application/sdp"))
 		{
 			#xlog("we have sdp on this $rm");
-			rtpproxy_offer("froc", "$PUBLIC_IPV4");
+			rtpproxy_offer("froc", "{{{public_ipv4}}}");
 		}
 	
 	}
@@ -996,7 +996,7 @@ route[PSTN_QUERY_ROUTE] {
 
 route[MEDIASERVICE_QUERY_ROUTE] {
 	$ru = "sip:" + $rU + "@" + $var(body);
-	append_hf("X-LineBlocs-Key: $LINEBLOCS_KEY\r\n");
+	append_hf("X-LineBlocs-Key: {{{lineblocs_key}}}\r\n");
 	append_hf("X-LineBlocs-Call-Type: media\r\n");
 	append_hf("X-LineBlocs-Direction: outgoing-proxy\r\n");
 
@@ -1021,7 +1021,7 @@ route[MEDIASERVICE_QUERY_ROUTE] {
 		# the rtpproxy_offer
 		if(has_body("application/sdp"))
 		{
-			rtpproxy_offer("froc", "$PUBLIC_IPV4");
+			rtpproxy_offer("froc", "{{{public_ipv4}}}");
 		}
 	}
 
@@ -1041,7 +1041,7 @@ route[MEDIASERVICE_QUERY_ROUTE] {
 
 route[ENDPOINT_QUERY_ROUTE] {
 	$ru = "sip:" + $rU + "@" + $var(body);
-	append_hf("X-LineBlocs-Key: $LINEBLOCS_KEY\r\n");
+	append_hf("X-LineBlocs-Key: {{{lineblocs_key}}}\r\n");
 	append_hf("X-LineBlocs-Call-Type: endpoint\r\n");
 	append_hf("X-LineBlocs-Direction: outgoing-proxy\r\n");
 
@@ -1067,7 +1067,7 @@ route[ENDPOINT_QUERY_ROUTE] {
 		# the rtpproxy_offer
 		if(has_body("application/sdp"))
 		{
-			rtpproxy_offer("froc", "$PUBLIC_IPV4");
+			rtpproxy_offer("froc", "{{{public_ipv4}}}");
 		}
 	}
 
@@ -1098,10 +1098,10 @@ onreply_route[HANDLE_NAT] {
 	# on our body, if we have, we answer that
 	if(is_method("ACK") && has_body("application/sdp"))
 	{
-		rtpproxy_answer("froc", "$PUBLIC_IPV4");
+		rtpproxy_answer("froc", "{{{public_ipv4}}}");
 	} else if(has_body("application/sdp")) {
 		# offering rtpproxy on a non ack message
-		rtpproxy_offer("froc", "$PUBLIC_IPV4");	
+		rtpproxy_offer("froc", "{{{public_ipv4}}}");	
 	}
 
 	# here we try to identify if the user is behind a nat again
@@ -1121,10 +1121,10 @@ onreply_route[PSTN_HANDLE_NAT] {
 
 	if(is_method("ACK") && has_body("application/sdp"))
 	{
-		rtpproxy_answer("froc", "$PUBLIC_IPV4");
+		rtpproxy_answer("froc", "{{{public_ipv4}}}");
 	} else if(has_body("application/sdp")) {
 		# offering rtpproxy on a non ack message
-		rtpproxy_offer("froc", "$PUBLIC_IPV4");	
+		rtpproxy_offer("froc", "{{{public_ipv4}}}");	
 	}
 
 	# here we try to identify if the user is behind a nat again
@@ -1137,7 +1137,7 @@ onreply_route[PSTN_HANDLE_NAT] {
 	# update SIP details
 	$var(body) = "requestto=" + $ru + "&user=" + $fU + "&domain=" + $fd + "&callid=" + $hdr(Call-ID) + "&status=" + $rs;
 	$var(reg) = "/\+/%2B/g";
-	async(rest_post("$API_URL/carrier/createSIPReport", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), SIP_REPORT);
+	async(rest_post("{{{api_url}}}/carrier/createSIPReport", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), SIP_REPORT);
 }
 
 failure_route[MISSED_CALL] {
@@ -1178,7 +1178,7 @@ route[RELAY_TO_USER_TRUNK] {
 		if(has_body("application/sdp"))
 		{
 			#xlog("we have sdp on this $rm");
-			rtpproxy_offer("froc", "$PUBLIC_IPV4");
+			rtpproxy_offer("froc", "{{{public_ipv4}}}");
 		}
 	}
 
@@ -1205,7 +1205,7 @@ failure_route[PSTN_FAILURE] {
 
 	$var(body) = "requestto=" + $ru + "&user=" + $fU + "&domain=" + $fd + "&callid=" + $hdr(Call-ID) + "&status=" + $rs;
 	$var(reg) = "/\+/%2B/g";
-	async(rest_post("$API_URL/carrier/createSIPReport", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), SIP_REPORT);
+	async(rest_post("{{{api_url}}}/carrier/createSIPReport", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), SIP_REPORT);
 }
 
 route[CAPTURE_HEP_ROUTE] {
@@ -1236,11 +1236,11 @@ route[POST_CALL_PROC_ROUTE] {
 	if(is_method("INVITE")) {
 		xlog("POST_CALL_PROC_ROUTE handling INVITE event");
 		$var(query) = "invite_ip=" + $ru;
-		async(rest_get("$API_URL/user/logCallInviteEvent?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), INVITE_REPORT_ROUTE);
+		async(rest_get("{{{api_url}}}/user/logCallInviteEvent?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), INVITE_REPORT_ROUTE);
 	} else if (is_method("BYE")) {
 		xlog("POST_CALL_PROC_ROUTE handling BYE event");
 		$var(query) = "invite_ip=" + $ru;
-		async(rest_get("$API_URL/user/logCallByeEvent?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), BYE_REPORT_ROUTE);
+		async(rest_get("{{{api_url}}}/user/logCallByeEvent?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), BYE_REPORT_ROUTE);
 	}
 	exit;
 }

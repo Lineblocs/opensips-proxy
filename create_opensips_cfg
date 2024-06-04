@@ -45,7 +45,8 @@ def get_db_params():
         return data
 
     data = {}
-    data['opensips_config'] = open("./mock-data/opensips.cfg", "r+").read()
+    # open template opensips config
+    data['opensips_config'] = open("/tmp/opensips.cfg", "r+").read()
     data['udp_support'] = 1
     data['udp_port'] = '5060'
     data['udp_autoscaling'] = 1
@@ -66,7 +67,7 @@ private_ipv4 = os.getenv('PRIVATE_IPV4')
 data = get_db_params()
 source = data['opensips_config']
 
-print("source ", source)
+#print("source ", source)
 with open(cfg_path_new, "w") as file:
     data = get_db_params()
     print ("UDP support=" + str( data['udp_support'] ))
@@ -93,6 +94,21 @@ with open(cfg_path_new, "w") as file:
     compiler = Compiler()
     template = compiler.compile(source)
     replacements = {}
+
+    replacements['api_url'] = os.getenv('API_URL')
+    replacements['private_ipv4'] = os.getenv('PRIVATE_IPV4')
+    replacements['public_ipv4'] = os.getenv('PUBLIC_IPV4')
+    replacements['rtpproxy_ipv4'] = os.getenv('RTPPROXY_IPV4')
+    replacements['db_user'] = os.getenv('DB_USER')
+    replacements['db_name'] = os.getenv('DB_NAME')
+    replacements['db_pass'] = os.getenv('DB_PASS')
+    replacements['db_host'] = os.getenv('DB_HOST')
+    replacements['db_opensips'] = os.getenv('DB_OPENSIPS')
+    replacements['db_homer'] = os.getenv('DB_HOMER')
+    replacements['lineblocs_key'] = os.getenv('LINEBLOCS_KEY')
+    replacements['deployment_domain'] = os.getenv('DEPLOYMENT_DOMAIN')
+
+
     if data['udp_support']:
         udp_code = create_proto_support_code( public_ipv4, 'udp', udp_port, udp_autoscaling )
         replacements['udp_support'] = udp_code
@@ -131,9 +147,11 @@ modparam("proto_tls", "ca_list", "cl_dom:{cert_dir}/user/user-calist.pem")"""
     replacements['user_agent']= "Lineblocs SIP router (powered by OpenSIPs)"
 
     output = template(replacements)
-    print("contents are now")
-    print(output)
-    print("writing new opensips.cfg file")
+    #print("contents are now")
+    #print(output)
+    print("writing new opensips.cfg contents to path " + cfg_path_new)
+
+    print("contents ", output)
     file.write( output )
 
 os.replace(cfg_path_new, cfg_path)
