@@ -99,6 +99,8 @@ with open(cfg_path_new, "w") as file:
     replacements['private_ipv4'] = os.getenv('PRIVATE_IPV4')
     replacements['public_ipv4'] = os.getenv('PUBLIC_IPV4')
     replacements['rtpproxy_ipv4'] = os.getenv('RTPPROXY_IPV4')
+    #replacements['advertized_ipv4'] = os.getenv('ADVERTIZED_IPV4')
+    replacements['advertized_ipv4'] = os.getenv('PUBLIC_IPV4')
     replacements['db_user'] = os.getenv('DB_USER')
     replacements['db_name'] = os.getenv('DB_NAME')
     replacements['db_pass'] = os.getenv('DB_PASS')

@@ -55,7 +55,7 @@ listen=hep_udp:{{{public_ipv4}}}:9060
 
 #socket=udp:{{{private_ipv4}}}:5060   # CUSTOMIZE ME
 alias=udp:{{{public_ipv4}}}:5060
-advertised_address="ADVERTIZED_IPV4"
+advertised_address="{{{advertized_ipv4}}}"
 
 
 
@@ -335,21 +335,9 @@ route{
 
 	if (is_method("REGISTER"))
 	{
-		# check if its a hosted trunk or SIP device
-		# we can verify this by checking if the domain ends in pstn.{{{deployment_domain}}}
-		if (pcre_match("$td", "pstn\.{{{deployment_domain}}}")) {
-    		xlog("L_INFO", "Hosted trunk was matched\n");
-			$var(query) = "domain=" + $fd + "&ip=" + $si + "&addr=" + $si + "&todomain=" + $td + "&fromuser=" + $fU + "&touser=" + $tU;
-			$var(reg) = "/\+/%2B/g";
-			async(rest_get("{{{api_url}}}/user/hostedSIPTrunkLookup?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), HOSTED_TRUNK_REGISTER);
-			exit;
-		} else {
-			$var(query) = "domain=" + $fd + "&ip=" + $si + "&addr=" + $si;
-			$var(reg) = "/\+/%2B/g";
-			xlog("REG calling API..");
-			async(rest_get("{{{api_url}}}/user/ipWhitelistLookup?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), REGISTER);
-			exit;
-		}
+		xlog("received REGISTER from SIP device\r\n");
+		relay(SIP_DEVICE_REGISTRATION);
+		exit;
 	}
 
 	if ($rU==NULL) 
@@ -361,36 +349,9 @@ route{
 
 	xlog("RECEIVED KEY: $hdr(X-LineBlocs-Key)\r\n");
 	xlog("RECEIVED AGENT: $hdr(User-Agent)\r\n");
-	if ($hdr(X-LineBlocs-Key) == "{{{lineblocs_key}}}") 
-	{ #internal asterisk
-		remove_hf("X-LineBlocs-Key");
-		xlog("received media server request from $si\r\n");
-		if (is_method("INVITE")) 
-		{
-			if ($hdr(X-Lineblocs-User-SIP-Trunk) == "true") 
-			{
-				route(RELAY_TO_USER_TRUNK);
-				exit;
-			} else {
-				if ($hdr(X-LineBlocs-Route-Type) == "extension")
-				{
-					xlog("routing to extension...\r\n");
-					async(rest_get("{{{api_url}}}/user/incomingMediaServerValidation?source=$si&addr=$si", $var(body), $var(ct), $var(rcode)), INCOMING_MS_VALIDATE_1_ROUTE);
-					#route(RELAY);
-					exit;
-				}
-
-				if ($hdr(X-LineBlocs-Route-Type) == "pstn")
-				{
-					#xlog("L_NOTICE", "calling URL: {{{api_url}}}/user/getPSTNProviderIP?from=$fU&to=$tU&domain=$hdr(X-LineBlocs-Domain)");
-
-					xlog("routing to pstn...\r\n");
-					async(rest_get("{{{api_url}}}/user/incomingMediaServerValidation?source=$si&addr=$si", $var(body), $var(ct), $var(rcode)), INCOMING_MS_VALIDATE_2_ROUTE);
-					exit;
-				}
-			}
-
-		}
+	if ($hdr(X-LineBlocs-Key) != "") { #internal asterisk
+		xlog("RECEIVED CALL FROM MEDIA SERVER\r\n");
+		relay(INTERNAL_MS_ROUTING);
 		exit;
 	}
 
@@ -398,53 +359,21 @@ route{
 	# scenario to handle calls from either subscribers or from SIPml5 agents
 	if (is_registered("location","$fu") || $hdr(User-Agent) == "IM-client/OMA1.0 sipML5-v1.2016.03.04") 
 	{
-		xlog("Using registered routing..\r\n");
-		if (is_method("INVITE")) 
-		{
-			if($rU =~ "[0-9]{1,}") 
-			{
-					if ($rU=~"^[0-9]{9,}") 
-					{ ## call to PSTN
-						$var(query) = "number=" + $tU + "&domain=" + $fd + "&addr=" + $si;
-						$var(reg) = "/\+/%2B/g";
-						async(rest_get("{{{api_url}}}/user/verifyCallerByDomain?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), VERIFY_CALLER_ROUTE);
-						exit;
-					} else if ($rU=~"^[0-9]{1,5}$") { ## call to another end device
-						$var(query) = "username=" + $fu + "&domain=" + $fd + "&routerip=" +  $socket_in(ip) + "&addr=" + $si;
-						$var(reg) = "/\+/%2B/g";
-						async(rest_get("{{{api_url}}}/user/getUserAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), ENDPOINT_QUERY_ROUTE);
-						exit;	
-					}
-				} else if ($rU=~"^\*[1-9]+") { ## media service call
-					$var(query) = "username=" + $fu + "&domain=" + $fd + "&routerip=" +  $socket_in(ip) + "&addr=" + $si;
-					$var(reg) = "/\+/%2B/g";
-					async(rest_get("{{{api_url}}}/user/getUserAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), MEDIASERVICE_QUERY_ROUTE);
-					exit;
-				}
-		}
+		xlog("RECEIVED CALL FROM EXTENSION\r\n");
+		relay(INTERNAL_EXTENSION_ROUTING);
+		exit;
 	}
 
 	# handle internal subscriber workflow or calls received from DID numbers
 	if (is_method("INVITE")) 
 	{
-		xlog("SOURCE IP IS: $si");
-		if ($hdr(X-LineBlocs-RingSubscriber) == "true")
-		{
-			xlog("sending to extension...\r\n");
-			route(RELAY);
-			exit;
-		} else {
-			$var(query) = "did=" + $tU + "&number=" + $fU + "&source=" + $si + "&routerip=" +  $socket_in(ip) + "&addr=" + $si;
-			$var(reg) = "/\+/%2B/g";
-
-			rest_append_hf("X-Lineblocs-Carrier-Auth: CARRIER_KEY");
-			async(rest_get("{{{api_url}}}/user/incomingDIDValidation?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), INCOMING_VALIDATION);
-			exit;
-		}
+		xlog("RECEIVED CALL FROM PSTN\r\n");
+		relay(PSTN_ROUTING);
+		exit;
 	}
+
 	route(RELAY);
 }
-
 
 route[RELAY] {
 
@@ -504,6 +433,102 @@ route[RELAY] {
     };
 
 	route(POST_CALL_PROC_ROUTE);
+}
+
+route[INTERNAL_MS_ROUTING] {
+	if ($hdr(X-LineBlocs-Key) == "{{{lineblocs_key}}}") { #internal asterisk
+		remove_hf("X-LineBlocs-Key");
+		xlog("received media server request from $si\r\n");
+		if (is_method("INVITE")) 
+		{
+			if ($hdr(X-Lineblocs-User-SIP-Trunk) == "true") 
+			{
+				route(RELAY_TO_USER_TRUNK);
+				exit;
+			} else {
+				if ($hdr(X-LineBlocs-Route-Type) == "extension")
+				{
+					xlog("routing to extension...\r\n");
+					async(rest_get("{{{api_url}}}/user/incomingMediaServerValidation?source=$si&addr=$si", $var(body), $var(ct), $var(rcode)), INCOMING_MS_VALIDATE_1_ROUTE);
+					#route(RELAY);
+					exit;
+				}
+
+				if ($hdr(X-LineBlocs-Route-Type) == "pstn")
+				{
+					#xlog("L_NOTICE", "calling URL: {{{api_url}}}/user/getPSTNProviderIP?from=$fU&to=$tU&domain=$hdr(X-LineBlocs-Domain)");
+
+					xlog("routing to pstn...\r\n");
+					async(rest_get("{{{api_url}}}/user/incomingMediaServerValidation?source=$si&addr=$si", $var(body), $var(ct), $var(rcode)), INCOMING_MS_VALIDATE_2_ROUTE);
+					exit;
+				}
+			}
+
+		}
+		exit;
+	}
+}
+
+route[INTERNAL_EXTENSION_ROUTING] {
+	xlog("Using registered routing..\r\n");
+	if (is_method("INVITE")) 
+	{
+		if($rU =~ "[0-9]{1,}") 
+		{
+				if ($rU=~"^[0-9]{9,}") 
+				{ ## call to PSTN
+					$var(query) = "number=" + $tU + "&domain=" + $fd + "&addr=" + $si;
+					$var(reg) = "/\+/%2B/g";
+					async(rest_get("{{{api_url}}}/user/verifyCallerByDomain?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), VERIFY_CALLER_ROUTE);
+					exit;
+				} else if ($rU=~"^[0-9]{1,5}$") { ## call to another end device
+					$var(query) = "username=" + $fu + "&domain=" + $fd + "&routerip=" +  $socket_in(ip) + "&addr=" + $si;
+					$var(reg) = "/\+/%2B/g";
+					async(rest_get("{{{api_url}}}/user/getUserAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), ENDPOINT_QUERY_ROUTE);
+					exit;	
+				}
+			} else if ($rU=~"^\*[1-9]+") { ## media service call
+				$var(query) = "username=" + $fu + "&domain=" + $fd + "&routerip=" +  $socket_in(ip) + "&addr=" + $si;
+				$var(reg) = "/\+/%2B/g";
+				async(rest_get("{{{api_url}}}/user/getUserAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), MEDIASERVICE_QUERY_ROUTE);
+				exit;
+			}
+	}
+}
+
+route[PSTN_ROUTING] {
+	xlog("SOURCE IP IS: $si");
+	if ($hdr(X-LineBlocs-RingSubscriber) == "true")
+	{
+		xlog("sending to extension...\r\n");
+		route(RELAY);
+		exit;
+	} else {
+		$var(query) = "did=" + $tU + "&number=" + $fU + "&source=" + $si + "&routerip=" +  $socket_in(ip) + "&addr=" + $si;
+		$var(reg) = "/\+/%2B/g";
+
+		rest_append_hf("X-Lineblocs-Carrier-Auth: CARRIER_KEY");
+		async(rest_get("{{{api_url}}}/user/incomingDIDValidation?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), INCOMING_VALIDATION);
+		exit;
+	}
+}
+
+route[SIP_DEVICE_REGISTRATION] {
+	# check if its a hosted trunk or SIP device
+	# we can verify this by checking if the domain ends in pstn.{{{deployment_domain}}}
+	if (pcre_match("$td", "pstn\.{{{deployment_domain}}}")) {
+		xlog("L_INFO", "Hosted trunk was matched\n");
+		$var(query) = "domain=" + $fd + "&ip=" + $si + "&addr=" + $si + "&todomain=" + $td + "&fromuser=" + $fU + "&touser=" + $tU;
+		$var(reg) = "/\+/%2B/g";
+		async(rest_get("{{{api_url}}}/user/hostedSIPTrunkLookup?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), HOSTED_TRUNK_REGISTER);
+		exit;
+	} else {
+		$var(query) = "domain=" + $fd + "&ip=" + $si + "&addr=" + $si;
+		$var(reg) = "/\+/%2B/g";
+		xlog("REG calling API..");
+		async(rest_get("{{{api_url}}}/user/ipWhitelistLookup?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), REGISTER);
+		exit;
+	}
 }
 
 route[RELAY_MS_TO_PSTN] {
