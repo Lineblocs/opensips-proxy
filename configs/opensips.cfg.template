@@ -336,7 +336,7 @@ route{
 	if (is_method("REGISTER"))
 	{
 		xlog("received REGISTER from SIP device\r\n");
-		relay(SIP_DEVICE_REGISTRATION);
+		route(SIP_DEVICE_REGISTRATION);
 		exit;
 	}
 
@@ -349,9 +349,9 @@ route{
 
 	xlog("RECEIVED KEY: $hdr(X-LineBlocs-Key)\r\n");
 	xlog("RECEIVED AGENT: $hdr(User-Agent)\r\n");
-	if ($hdr(X-LineBlocs-Key) != "") { #internal asterisk
+	if ($hdr(X-LineBlocs-Key) != NULL) { #internal asterisk
 		xlog("RECEIVED CALL FROM MEDIA SERVER\r\n");
-		relay(INTERNAL_MS_ROUTING);
+		route(INTERNAL_MS_ROUTING);
 		exit;
 	}
 
@@ -360,7 +360,7 @@ route{
 	if (is_registered("location","$fu") || $hdr(User-Agent) == "IM-client/OMA1.0 sipML5-v1.2016.03.04") 
 	{
 		xlog("RECEIVED CALL FROM EXTENSION\r\n");
-		relay(INTERNAL_EXTENSION_ROUTING);
+		route(INTERNAL_EXTENSION_ROUTING);
 		exit;
 	}
 
@@ -368,7 +368,7 @@ route{
 	if (is_method("INVITE")) 
 	{
 		xlog("RECEIVED CALL FROM PSTN\r\n");
-		relay(PSTN_ROUTING);
+		route(PSTN_ROUTING);
 		exit;
 	}
 
@@ -436,37 +436,41 @@ route[RELAY] {
 }
 
 route[INTERNAL_MS_ROUTING] {
-	if ($hdr(X-LineBlocs-Key) == "{{{lineblocs_key}}}") { #internal asterisk
+	if ($hdr(X-LineBlocs-Key) != "{{{lineblocs_key}}}") { #internal asterisk
+		xlog("invalid routing key received.\r\n");
 		remove_hf("X-LineBlocs-Key");
-		xlog("received media server request from $si\r\n");
-		if (is_method("INVITE")) 
-		{
-			if ($hdr(X-Lineblocs-User-SIP-Trunk) == "true") 
-			{
-				route(RELAY_TO_USER_TRUNK);
-				exit;
-			} else {
-				if ($hdr(X-LineBlocs-Route-Type) == "extension")
-				{
-					xlog("routing to extension...\r\n");
-					async(rest_get("{{{api_url}}}/user/incomingMediaServerValidation?source=$si&addr=$si", $var(body), $var(ct), $var(rcode)), INCOMING_MS_VALIDATE_1_ROUTE);
-					#route(RELAY);
-					exit;
-				}
-
-				if ($hdr(X-LineBlocs-Route-Type) == "pstn")
-				{
-					#xlog("L_NOTICE", "calling URL: {{{api_url}}}/user/getPSTNProviderIP?from=$fU&to=$tU&domain=$hdr(X-LineBlocs-Domain)");
-
-					xlog("routing to pstn...\r\n");
-					async(rest_get("{{{api_url}}}/user/incomingMediaServerValidation?source=$si&addr=$si", $var(body), $var(ct), $var(rcode)), INCOMING_MS_VALIDATE_2_ROUTE);
-					exit;
-				}
-			}
-
-		}
 		exit;
 	}
+
+	remove_hf("X-LineBlocs-Key");
+	xlog("received media server request from $si\r\n");
+	if (is_method("INVITE")) 
+	{
+		if ($hdr(X-Lineblocs-User-SIP-Trunk) == "true") 
+		{
+			route(RELAY_TO_USER_TRUNK);
+			exit;
+		} else {
+			if ($hdr(X-LineBlocs-Route-Type) == "extension")
+			{
+				xlog("routing to extension...\r\n");
+				async(rest_get("{{{api_url}}}/user/incomingMediaServerValidation?source=$si&addr=$si", $var(body), $var(ct), $var(rcode)), INCOMING_MS_VALIDATE_1_ROUTE);
+				#route(RELAY);
+				exit;
+			}
+
+			if ($hdr(X-LineBlocs-Route-Type) == "pstn")
+			{
+				#xlog("L_NOTICE", "calling URL: {{{api_url}}}/user/getPSTNProviderIP?from=$fU&to=$tU&domain=$hdr(X-LineBlocs-Domain)");
+
+				xlog("routing to pstn...\r\n");
+				async(rest_get("{{{api_url}}}/user/incomingMediaServerValidation?source=$si&addr=$si", $var(body), $var(ct), $var(rcode)), INCOMING_MS_VALIDATE_2_ROUTE);
+				exit;
+			}
+		}
+
+	}
+	exit;
 }
 
 route[INTERNAL_EXTENSION_ROUTING] {
