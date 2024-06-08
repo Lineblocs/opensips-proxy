@@ -406,12 +406,7 @@ route[RELAY] {
 		{
 			#xlog("we have sdp on this $rm");
 			# check if the RTP proxy was already selected or not
-			if ($hdr(X-LineBlocs-RTPProxy) != "") 
-			{
-				rtpproxy_offer("froc", "$hdr(X-LineBlocs-RTPProxy)");
-			} else {
-				rtpproxy_offer("froc", "{{{public_ipv4}}}");
-			}
+			rtpproxy_offer("froc", "{{{public_ipv4}}}");
 		}
 	
 		if (lookup("location","m")) 
