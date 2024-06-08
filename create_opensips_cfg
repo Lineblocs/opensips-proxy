@@ -1,6 +1,7 @@
 #! /usr/bin/python3
 import pymysql
 import pymysql.cursors
+import secrets
 import os
 from pybars import Compiler
 
@@ -57,7 +58,9 @@ def get_db_params():
     data['tls_port'] = '5061'
     return data
 
-    
+ def generate_carrier_key(length=16):   
+    carrier_key = secrets.token_urlsafe(length)
+    return carrier_key
 
 print("updating OpenSIPs config with database parameters")
 cfg_path = "/etc/opensips/opensips.cfg"
@@ -109,6 +112,12 @@ with open(cfg_path_new, "w") as file:
     replacements['db_homer'] = os.getenv('DB_HOMER')
     replacements['lineblocs_key'] = os.getenv('LINEBLOCS_KEY')
     replacements['deployment_domain'] = os.getenv('DEPLOYMENT_DOMAIN')
+    carrier_key = os.getenv('CARRIER_KEY') 
+    if carrier_key is None:
+        carrier_key = generate_carrier_key()
+        print(f"generated carrier key: {carrier_key}")
+
+    replacements['carrier_key'] = carrier_key
 
 
     if data['udp_support']:

@@ -27,6 +27,10 @@ if [[ -z "${API_URL}" ]]; then
    export API_URL="${API_SCHEME}://internals.${DEPLOYMENT_DOMAIN}"
 fi
 
+if [[ -z "${CARRIER_KEY}" ]]; then
+   echo "no carrier key is setup, so it will be created automatically"
+fi
+
 echo "Public ipv4: ${PUBLIC_IPV4}"
 echo "Private ipv4: ${PRIVATE_IPV4}"
 echo "API URL: ${API_URL}"

@@ -506,7 +506,7 @@ route[PSTN_ROUTING] {
 		$var(query) = "did=" + $tU + "&number=" + $fU + "&source=" + $si + "&routerip=" +  $socket_in(ip) + "&addr=" + $si;
 		$var(reg) = "/\+/%2B/g";
 
-		rest_append_hf("X-Lineblocs-Carrier-Auth: CARRIER_KEY");
+		rest_append_hf("X-Lineblocs-Carrier-Auth: {{{carrier_key}}}");
 		async(rest_get("{{{api_url}}}/user/incomingDIDValidation?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), INCOMING_VALIDATION);
 		exit;
 	}
