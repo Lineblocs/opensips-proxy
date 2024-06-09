@@ -609,11 +609,8 @@ route[INCOMING_VALIDATION] {
 		$var(query) = "did=" + $tU + "&number=" + $fU + "&source=" + $si + "&routerip=" +  $socket_in(ip) + "&addr=" + $si + "&fromdomain=" + $fd;
 		$var(reg) = "/\+/%2B/g";
 
-		rest_append_hf("X-Lineblocs-Carrier-Auth: CARRIER_KEY");
+		rest_append_hf("X-Lineblocs-Carrier-Auth: {{{carrier_key}}}");
 		async(rest_get("{{{api_url}}}/user/incomingTrunkValidation?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), TRUNK_VALIDATION);
-		exit;
-
-		send_reply(500, "PSTN Routing Failed #1");
 		exit;
 	}
 
@@ -621,21 +618,21 @@ route[INCOMING_VALIDATION] {
 	{
         case "user_sip_trunk":
 			append_hf("X-LineBlocs-Fulfill-Type: user_sip_trunk\r\n");
-			rest_append_hf("X-Lineblocs-Carrier-Auth: CARRIER_KEY");
+			rest_append_hf("X-Lineblocs-Carrier-Auth: {{{carrier_key}}}");
 			$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
 			$var(reg) = "/\+/%2B/g";
 			async(rest_get("{{{api_url}}}/user/processSIPTrunkCall?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), USER_SIP_TRUNK);
         break;
-        case "hosted":
-			append_hf("X-LineBlocs-Fulfill-Type: hosted\r\n");
-			rest_append_hf("X-Lineblocs-Carrier-Auth: CARRIER_KEY");
+        case "network_managed":
+			append_hf("X-LineBlocs-Fulfill-Type: network_managed\r\n");
+			rest_append_hf("X-Lineblocs-Carrier-Auth: {{{carrier_key}}}");
 			$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
 			$var(reg) = "/\+/%2B/g";
 			async(rest_get("{{{api_url}}}/user/getDIDAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), DID_ASSIGNED);
         break;
         case "byo_carrier":
 			append_hf("X-LineBlocs-Fulfill-Type: byo_carrier\r\n");
-			rest_append_hf("X-Lineblocs-Carrier-Auth: CARRIER_KEY");
+			rest_append_hf("X-Lineblocs-Carrier-Auth: {{{carrier_key}}}");
 			$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
 			$var(reg) = "/\+/%2B/g";
 			async(rest_get("{{{api_url}}}/user/getDIDAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), DID_ASSIGNED);
@@ -651,8 +648,8 @@ route[TRUNK_VALIDATION] {
 		exit;
 	}
 
-	append_hf("X-LineBlocs-Fulfill-Type: hosted\r\n");
-	rest_append_hf("X-Lineblocs-Carrier-Auth: CARRIER_KEY");
+	append_hf("X-LineBlocs-Fulfill-Type: network_managed\r\n");
+	rest_append_hf("X-Lineblocs-Carrier-Auth: {{{carrier_key}}}");
 	$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
 	$var(reg) = "/\+/%2B/g";
 	async(rest_get("{{{api_url}}}/user/getTrunkAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), TRUNK_ASSIGNED);
@@ -666,7 +663,7 @@ route[USER_SIP_TRUNK] {
 		exit;
 	}
 
-	rest_append_hf("X-Lineblocs-Carrier-Auth: CARRIER_KEY");
+	rest_append_hf("X-Lineblocs-Carrier-Auth: {{{carrier_key}}}");
 	append_hf("X-Lineblocs-User-SIP-Trunk-Addr: $var(body)\r\n");
 	$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
 	$var(reg) = "/\+/%2B/g";
@@ -680,7 +677,7 @@ route[INCOMING_VALIDATION_2] {
 		exit;
 	}
 
-	rest_append_hf("X-Lineblocs-Carrier-Auth: CARRIER_KEY");
+	rest_append_hf("X-Lineblocs-Carrier-Auth: {{{carrier_key}}}");
 	$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
 	$var(reg) = "/\+/%2B/g";
 	async(rest_get("{{{api_url}}}/user/getDIDAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), DID_ASSIGNED);
@@ -694,7 +691,7 @@ route[DID_ASSIGNED] {
 	}
 
 	$ru = "sip:" + $rU + "@" + $var(body);
-	rest_append_hf("X-Lineblocs-Carrier-Auth: CARRIER_KEY");
+	rest_append_hf("X-Lineblocs-Carrier-Auth: {{{carrier_key}}}");
 	$var(query) = "did=" + $tU + "&addr=" + $si;
 	$var(reg) = "/\+/%2B/g";
 	async(rest_get("{{{api_url}}}/user/getDIDAcceptOption?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), CALL_ACTION);
@@ -708,7 +705,7 @@ route[TRUNK_ASSIGNED] {
 	}
 
 	$ru = "sip:" + $rU + "@" + $var(body);
-	#rest_append_hf("X-Lineblocs-Carrier-Auth: CARRIER_KEY");
+	#rest_append_hf("X-Lineblocs-Carrier-Auth: {{{carrier_key}}}");
 	append_hf("X-LineBlocs-Key: {{{lineblocs_key}}}\r\n");
 	append_hf("X-LineBlocs-Accept-Call-Type: voice\r\n");
 	append_hf("X-LineBlocs-Direction: outgoing-proxy-trunk\r\n");
