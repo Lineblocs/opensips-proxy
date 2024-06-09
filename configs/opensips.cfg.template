@@ -648,7 +648,7 @@ route[TRUNK_VALIDATION] {
 		exit;
 	}
 
-	append_hf("X-LineBlocs-Fulfill-Type: network_managed\r\n");
+	append_hf("X-LineBlocs-Fulfill-Type: user_sip_trunk\r\n");
 	rest_append_hf("X-Lineblocs-Carrier-Auth: {{{carrier_key}}}");
 	$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
 	$var(reg) = "/\+/%2B/g";
