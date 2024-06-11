@@ -580,12 +580,14 @@ route[CLEANUP_SIP_CALL] {
 route[FINALIZE_SIP_CALL] {
 	if ($var(rcode) != 200) 
 	{
-		xlog("L_INFO", "error occured while creating CDRs\n");
+		xlog("L_INFO", "important: error occured while creating CDRs\n");
 		send_reply(500, "ERROR while processing BYE event (scenario 1)");
+		route(RELAY);
 		exit;
 	}
 
-	xlog("L_INFO", "created CDRs and billed user successfully. ending call.\n");
+	xlog("L_INFO", "created CDRs and billed user successfully.\n");
+	route(RELAY);
 	exit;
 }
 
