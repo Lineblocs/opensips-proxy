@@ -372,6 +372,14 @@ route{
 		exit;
 	}
 
+	# handle BYE event
+	if (is_method("BYE")) 
+	{
+		xlog("BYE RECEIVED FROM $fU at $si\n");
+		route(CLEANUP_SIP_CALL);
+		exit;
+	}
+
 	route(RELAY);
 }
 
@@ -441,35 +449,52 @@ route[INTERNAL_MS_ROUTING] {
 	xlog("received media server request from $si\r\n");
 	if (is_method("INVITE")) 
 	{
-		if ($hdr(X-Lineblocs-User-SIP-Trunk) == "true") 
-		{
-			route(RELAY_TO_USER_TRUNK);
-			exit;
-		} else {
-			if ($hdr(X-LineBlocs-Route-Type) == "extension")
-			{
-				xlog("routing to extension...\r\n");
-
-				rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
-				async(rest_get("{{{api_url}}}/user/incomingMediaServerValidation?source=$si&addr=$si", $var(body), $var(ct), $var(rcode)), INCOMING_MS_VALIDATE_1_ROUTE);
-				#route(RELAY);
-				exit;
-			}
-
-			if ($hdr(X-LineBlocs-Route-Type) == "pstn")
-			{
-				#xlog("L_NOTICE", "calling URL: {{{api_url}}}/user/getPSTNProviderIP?from=$fU&to=$tU&domain=$hdr(X-LineBlocs-Domain)");
-
-				xlog("routing to pstn...\r\n");
-
-				rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
-				async(rest_get("{{{api_url}}}/user/incomingMediaServerValidation?source=$si&addr=$si", $var(body), $var(ct), $var(rcode)), INCOMING_MS_VALIDATE_2_ROUTE);
-				exit;
-			}
-		}
-
+		xlog("routing call invite.\r\n");
+		# set the SIP call ID
+		$var(body) = "callid=" + $hdr(Call-ID) + "&apiid=" + $hdr(X-LineBlocs-API-CallId) + "&source=" + $si;
+		$var(reg) = "/\+/%2B/g";
+		rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+		async(rest_post("{{{api_url}}}/call/setSIPCallID", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), MS_UPDATED_CALL_ID);
+		exit;
 	}
 	exit;
+}
+
+
+route[MS_UPDATED_CALL_ID] {
+	if ($var(rcode) != 200) 
+	{
+		send_reply(500, "Media server Routing Failed (scenario 4)");
+		exit;
+	}
+
+	xlog("set SIP call ID successfully. routing call now...\r\n");
+	if ($hdr(X-Lineblocs-User-SIP-Trunk) == "true") 
+	{
+		route(RELAY_TO_USER_TRUNK);
+		exit;
+	} else {
+		if ($hdr(X-LineBlocs-Route-Type) == "extension")
+		{
+			xlog("routing to extension...\r\n");
+
+			rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+			async(rest_get("{{{api_url}}}/user/incomingMediaServerValidation?source=$si&addr=$si", $var(body), $var(ct), $var(rcode)), INCOMING_MS_VALIDATE_1_ROUTE);
+			#route(RELAY);
+			exit;
+		}
+
+		if ($hdr(X-LineBlocs-Route-Type) == "pstn")
+		{
+			#xlog("L_NOTICE", "calling URL: {{{api_url}}}/user/getPSTNProviderIP?from=$fU&to=$tU&domain=$hdr(X-LineBlocs-Domain)");
+
+			xlog("routing to pstn...\r\n");
+
+			rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+			async(rest_get("{{{api_url}}}/user/incomingMediaServerValidation?source=$si&addr=$si", $var(body), $var(ct), $var(rcode)), INCOMING_MS_VALIDATE_2_ROUTE);
+			exit;
+		}
+	}
 }
 
 route[INTERNAL_EXTENSION_ROUTING] {
@@ -541,6 +566,27 @@ route[SIP_DEVICE_REGISTRATION] {
 		async(rest_get("{{{api_url}}}/user/ipWhitelistLookup?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), REGISTER);
 		exit;
 	}
+}
+
+route[CLEANUP_SIP_CALL] {
+	xlog("L_INFO", "cleaning up SIP call\n");
+	$var(body) = "callid=" + $hdr(Call-ID) + "&source=" + $si;
+	$var(reg) = "/\+/%2B/g";
+	rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+	async(rest_post("{{{api_url}}}/call/processCDRsAndBill", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), FINALIZE_SIP_CALL);
+	exit;
+}
+
+route[FINALIZE_SIP_CALL] {
+	if ($var(rcode) != 200) 
+	{
+		xlog("L_INFO", "error occured while creating CDRs\n");
+		send_reply(500, "ERROR while processing BYE event (scenario 1)");
+		exit;
+	}
+
+	xlog("L_INFO", "created CDRs and billed user successfully. ending call.\n");
+	exit;
 }
 
 route[RELAY_MS_TO_PSTN] {
