@@ -372,14 +372,6 @@ route{
 		exit;
 	}
 
-	# handle BYE event
-	if (is_method("BYE")) 
-	{
-		xlog("BYE RECEIVED FROM $fU at $si\n");
-		route(CLEANUP_SIP_CALL);
-		exit;
-	}
-
 	route(RELAY);
 }
 
@@ -566,29 +558,6 @@ route[SIP_DEVICE_REGISTRATION] {
 		async(rest_get("{{{api_url}}}/user/ipWhitelistLookup?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), REGISTER);
 		exit;
 	}
-}
-
-route[CLEANUP_SIP_CALL] {
-	xlog("L_INFO", "cleaning up SIP call\n");
-	$var(body) = "callid=" + $hdr(Call-ID) + "&source=" + $si;
-	$var(reg) = "/\+/%2B/g";
-	rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
-	async(rest_post("{{{api_url}}}/call/processCDRsAndBill", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), FINALIZE_SIP_CALL);
-	exit;
-}
-
-route[FINALIZE_SIP_CALL] {
-	if ($var(rcode) != 200) 
-	{
-		xlog("L_INFO", "important: error occured while creating CDRs\n");
-		send_reply(500, "ERROR while processing BYE event (scenario 1)");
-		route(RELAY);
-		exit;
-	}
-
-	xlog("L_INFO", "created CDRs and billed user successfully.\n");
-	route(RELAY);
-	exit;
 }
 
 route[RELAY_MS_TO_PSTN] {
@@ -1346,11 +1315,25 @@ route[POST_CALL_PROC_ROUTE] {
 		async(rest_get("{{{api_url}}}/user/logCallInviteEvent?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), INVITE_REPORT_ROUTE);
 	} else if (is_method("BYE")) {
 		xlog("POST_CALL_PROC_ROUTE handling BYE event");
-		$var(query) = "invite_ip=" + $ru;
 
+		xlog("L_INFO", "cleaning up SIP call\n");
+		$var(body) = "callid=" + $hdr(Call-ID) + "&source=" + $si;
+		$var(reg) = "/\+/%2B/g";
 		rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
-		async(rest_get("{{{api_url}}}/user/logCallByeEvent?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), BYE_REPORT_ROUTE);
+		async(rest_post("{{{api_url}}}/user/processCDRsAndBill", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), FINALIZE_SIP_CALL);
 	}
+	exit;
+}
+
+route[FINALIZE_SIP_CALL] {
+	if ($var(rcode) != 200) 
+	{
+		xlog("L_INFO", "important: error occured while creating CDRs\n");
+		send_reply(500, "ERROR while processing BYE event (scenario 1)");
+		exit;
+	}
+
+	xlog("L_INFO", "created CDRs and billed user successfully.\n");
 	exit;
 }
 
@@ -1363,5 +1346,3 @@ route[BYE_REPORT_ROUTE] {
 	xlog("BYE_REPORT_ROUTE callback triggered");
 	exit;
 }
-
-
