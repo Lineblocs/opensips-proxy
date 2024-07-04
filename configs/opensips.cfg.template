@@ -210,6 +210,13 @@ loadmodule "regex.so"
 # main request routing logic
 route{
 
+	# replace user agent with the branded one configured in database
+	if(remove_hf("User-Agent"))
+	{
+		# User Agent header was removed
+		append_hf("User-Agent: {{{user_agent}}}\r\n"); 
+	}
+
 	if ($ua=~"friendly-scanner") 
 	{
 		 xlog("L_ERROR", "Auth error for $fU@$fd from $si method $rm user-agent (friendly-scanner)\n");
