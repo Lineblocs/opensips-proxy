@@ -1326,7 +1326,7 @@ route[POST_CALL_PROC_ROUTE] {
 }
 
 route[FINALIZE_SIP_CALL] {
-	if ($var(rcode) != 200) 
+	if ($var(rcode) != 204) 
 	{
 		xlog("L_INFO", "important: error occured while creating CDRs\n");
 		send_reply(500, "ERROR while processing BYE event (scenario 1)");
