@@ -500,32 +500,51 @@ route[INTERNAL_EXTENSION_ROUTING] {
 	xlog("Using registered routing..\r\n");
 	if (is_method("INVITE")) 
 	{
-		if($rU =~ "[0-9]{1,}") 
+		xlog("Processing INVITE request..\r\n");
+		xlog("request number before URL decode: $rU\r\n");
+		xlog("to number before URL decode: $tU\r\n");
+		$var(reg) = "/%2B|%E2|%80|%AC|%91//g";
+		$var(reqnum) = $(rU{re.subst,$var(reg)});
+		$var(tonum) = $(tU{re.subst,$var(reg)});
+
+		xlog("request number after URL decode: $(var(reqnum))\r\n");
+		xlog("to number after URL decode: $(var(tonum))\r\n");
+
+		if($var(reqnum) =~ "[0-9]{1,}") 
 		{
-				if ($rU=~"^[0-9]{9,}") 
-				{ ## call to PSTN
-					$var(query) = "number=" + $tU + "&domain=" + $fd + "&addr=" + $si;
+			## call to PSTN
+			if ($var(reqnum)=~"^[0-9]{9,}") 
+			{
+					$var(query) = "number=" + $var(tonum) + "&domain=" + $fd + "&addr=" + $si;
 					$var(reg) = "/\+/%2B/g";
 
 					rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
 					async(rest_get("{{{api_url}}}/user/verifyCallerByDomain?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), VERIFY_CALLER_ROUTE);
 					exit;
-				} else if ($rU=~"^[0-9]{1,5}$") { ## call to another end device
-					$var(query) = "username=" + $fu + "&domain=" + $fd + "&routerip=" +  $socket_in(ip) + "&addr=" + $si;
-					$var(reg) = "/\+/%2B/g";
+			} else if ($var(reqnum)=~"^[0-9]{1,5}$") { ## call to another end device
+				$var(query) = "username=" + $fu + "&domain=" + $fd + "&routerip=" +  $socket_in(ip) + "&addr=" + $si;
+				$var(reg) = "/\+/%2B/g";
 
-					rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
-					async(rest_get("{{{api_url}}}/user/getUserAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), ENDPOINT_QUERY_ROUTE);
-					exit;	
-				}
-			} else if ($rU=~"^\*[1-9]+") { ## media service call
+				rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+				async(rest_get("{{{api_url}}}/user/getUserAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), ENDPOINT_QUERY_ROUTE);
+				exit;	
+			} else if ($var(reqnum)=~"^\*[1-9]+") { ## media service call
 				$var(query) = "username=" + $fu + "&domain=" + $fd + "&routerip=" +  $socket_in(ip) + "&addr=" + $si;
 				$var(reg) = "/\+/%2B/g";
 
 				rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
 				async(rest_get("{{{api_url}}}/user/getUserAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), MEDIASERVICE_QUERY_ROUTE);
 				exit;
+			} else {
+				# dial pattern isnt unsupported
+				send_reply(400, "Dial pattern not supported (scenario 1)");
+				exit;
 			}
+		} else {
+			# dial pattern isnt unsupported
+			send_reply(400, "Dial pattern not supported (scenario 2)");
+			exit;
+		}
 	}
 }
 
@@ -1023,7 +1042,12 @@ route[VERIFY_FORBIDDEN] {
 
 route[PSTN_QUERY_ROUTE] {
 	xlog("pstn query result $(var(body))\r\n");
-	$ru = "sip:" + $rU + "@" + $var(body);
+
+	xlog("req number before URL decode: $rU\r\n");
+	$var(reg) = "/%2B|%E2|%80|%AC|%91//g";
+	$var(reqnum) = $(rU{re.subst,$var(reg)});
+	xlog("req number after URL decode: $(var(reqnum))\r\n");
+	$ru = "sip:" + $var(reqnum) + "@" + $var(body);
 	append_hf("X-LineBlocs-Key: {{{lineblocs_key}}}\r\n");
 	append_hf("X-LineBlocs-Call-Type: pstn\r\n");
 	append_hf("X-LineBlocs-Direction: outgoing-proxy\r\n");
