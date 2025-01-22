@@ -1,7 +1,7 @@
 #
 # Lineblocs routing scripts
 #  
-# designed for OpenSIPS Solutions
+# made with OpenSIPS 3.x
 #
 
 
@@ -50,6 +50,12 @@ timer_workers = 2 use_auto_scaling_profile PROFILE_TIMER
 # TLS support
 #listen=tcp:127.0.0.1:5080
 {{{tcp_support}}}
+
+# WS support
+{{{ws_support}}}
+
+# WSS support
+{{{wss_support}}}
 
 listen=hep_udp:{{{public_ipv4}}}:9060
 
@@ -178,8 +184,17 @@ modparam("acc", "detect_direction", 0)
 #modparam("proto_tcp", "tcp_port", 5065)
 {{{tcp_load_module}}}
 
+# WS protocol
+#loadmodule "proto_ws.so"
+{{{ws_load_module}}}
 
+#loadmodule "proto_wss.so"
+{{{wss_load_module}}}
 
+# TLS configuration
+#modparam("proto_wss", "certificate", "/path/to/cert.pem")
+#modparam("proto_wss", "private_key", "/path/to/key.pem")
+#modparam("proto_wss", "verify_cert", 0)
 
 # ----- multi-module params -----
 modparam("alias_db|auth_db|usrloc", "use_domain", 1)

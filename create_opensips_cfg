@@ -130,6 +130,18 @@ modparam("proto_udp", "udp_port", {udp_port})"""
         replacements['tcp_support'] = tcp_code
         replacements['tcp_load_module'] = f"""loadmodule "proto_tcp.so"
 modparam("proto_tcp", "tcp_port", {tcp_port})"""
+    if data['ws_support']:
+        ws_code = create_proto_support_code( public_ipv4, 'ws', ws_port)
+        replacements['ws_support'] = ws_code
+        replacements['ws_load_module'] = f"""loadmodule "proto_ws.so""""
+    if data['wss_support']:
+        wss_code = create_proto_support_code( public_ipv4, 'wss', wss_port)
+        replacements['wss_support'] = wss_code
+        replacements['wss_load_module'] = f"""loadmodule "proto_wss.so
+modparam("proto_wss", "certificate", "{cert_dir}/cert.pem")
+modparam("proto_wss", "private_key", "{cert_dir}/key.pem")
+modparam("proto_wss", "verify_cert", 0)
+        """"
     if data['tls_support']:
         tls_code = create_proto_support_code( public_ipv4, 'tls', tls_port, False)
         replacements['tls_support'] = tls_code
