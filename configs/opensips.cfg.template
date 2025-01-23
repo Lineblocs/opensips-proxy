@@ -220,6 +220,8 @@ user_agent_header="User-Agent: {{{user_agent}}}"
 
 loadmodule "regex.so"
 
+loadmodule "sdpops.so"
+
 ####### Routing Logic ########
 
 # main request routing logic
@@ -423,11 +425,31 @@ route[RELAY] {
 		}
 
 		# if we have an application/sdp on our body, so we execute
-                # the rtpproxy_offer
+        # the rtpproxy_offer
 		if(has_body("application/sdp"))
 		{
 			#xlog("we have sdp on this $rm");
 			# check if the RTP proxy was already selected or not
+			if ($proto =~ "ws") {
+				xlog("WebSocket connection detected - updating SDP profile for WebRTC\n");
+				
+				if(!sdp_proto_update("UDP/TLS/RTP/SAVPF")) {
+					xlog("Error: Failed updating SDP protocol\n"); 
+				}
+
+				if(!sdp_set_ice_attributes()) {
+					xlog("Error: Failed setting ICE attributes\n");
+				}
+
+				$var(fingerprint) = "AC:D6:69:C4:D7:8B:C5:A1:D5:48:EF:74:7C:67:23:9E:EE:5E:46:94:CB:B8:B6:F6:04:AB:E8:0F:1C:C3:B7:DB";
+				sdp_mangle_string("a=setup:actpass");
+				sdp_mangle_string("a=fingerprint:sha-256 " + $var(fingerprint));
+				sdp_mangle_string("a=ice-ufrag:rl1wX7nA"); 
+				sdp_mangle_string("a=ice-pwd:nDsg1dRi0QaiWIxA");
+				sdp_mangle_string("a=ice-options:trickle");
+				sdp_mangle_string("a=rtcp-mux");
+			}
+
 			rtpproxy_offer("froc", "{{{public_ipv4}}}");
 		}
 	
@@ -1092,6 +1114,24 @@ route[PSTN_QUERY_ROUTE] {
 		if(has_body("application/sdp"))
 		{
 			#xlog("we have sdp on this $rm");
+			if ($proto =~ "ws") {
+				xlog("Updating SDP for WebRTC PSTN call\n");
+				if(!sdp_proto_update("UDP/TLS/RTP/SAVPF")) {
+					xlog("Error updating SDP protocol\n"); 
+				}
+
+				if(!sdp_set_ice_attributes()) {
+					xlog("Error setting ICE attributes\n");
+				}
+
+				sdp_mangle_string("a=setup:actpass");
+				sdp_mangle_string("a=fingerprint:sha-256 AC:D6:69:C4:D7:8B:C5:A1:D5:48:EF:74:7C:67:23:9E:EE:5E:46:94:CB:B8:B6:F6:04:AB:E8:0F:1C:C3:B7:DB");
+				sdp_mangle_string("a=ice-ufrag:rl1wX7nA"); 
+				sdp_mangle_string("a=ice-pwd:nDsg1dRi0QaiWIxA");
+				sdp_mangle_string("a=ice-options:trickle");
+				sdp_mangle_string("a=rtcp-mux");
+			}
+			
 			rtpproxy_offer("froc", "{{{public_ipv4}}}");
 		}
 	

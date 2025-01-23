@@ -38,7 +38,7 @@ def get_db_params():
         cursor = db.cursor()
         cursor = db.cursor(pymysql.cursors.DictCursor)
 
-        cursor.execute("SELECT opensips_config, udp_support, udp_port, udp_autoscaling, tcp_support, tcp_port, tcp_autoscaling, tls_support, tls_port FROM customizations")
+        cursor.execute("SELECT opensips_config, udp_support, udp_port, udp_autoscaling, tcp_support, tcp_port, tcp_autoscaling, tls_support, tls_port, ws_support, ws_port, wss_support, wss_port FROM customizations")
         data = cursor.fetchone()
 
         # disconnect from server
@@ -56,6 +56,10 @@ def get_db_params():
     data['tcp_autoscaling'] = 1
     data['tls_support'] = 0
     data['tls_port'] = '5061'
+    data['ws_support'] = 1
+    data['ws_port'] = '10061'
+    data['wss_support'] = 1
+    data['wss_port'] = '10062'
     return data
 
 def generate_carrier_key(length=16):
@@ -93,6 +97,10 @@ with open(cfg_path_new, "w") as file:
     cert_dir = ""
     tls_client_ip_addr = ""
     tls_client_port = ""
+    ws_port = data['ws_port']
+    ws_support = data['ws_support']
+    wss_port = data['wss_port']
+    wss_support = data['wss_support']
 
     compiler = Compiler()
     template = compiler.compile(source)
@@ -133,15 +141,14 @@ modparam("proto_tcp", "tcp_port", {tcp_port})"""
     if data['ws_support']:
         ws_code = create_proto_support_code( public_ipv4, 'ws', ws_port)
         replacements['ws_support'] = ws_code
-        replacements['ws_load_module'] = f"""loadmodule "proto_ws.so""""
+        replacements['ws_load_module'] = f"""loadmodule "proto_ws.so"""
     if data['wss_support']:
         wss_code = create_proto_support_code( public_ipv4, 'wss', wss_port)
         replacements['wss_support'] = wss_code
         replacements['wss_load_module'] = f"""loadmodule "proto_wss.so
 modparam("proto_wss", "certificate", "{cert_dir}/cert.pem")
 modparam("proto_wss", "private_key", "{cert_dir}/key.pem")
-modparam("proto_wss", "verify_cert", 0)
-        """"
+modparam("proto_wss", "verify_cert", 0)"""
     if data['tls_support']:
         tls_code = create_proto_support_code( public_ipv4, 'tls', tls_port, False)
         replacements['tls_support'] = tls_code
