@@ -58,7 +58,7 @@ def get_db_params():
     data['tls_port'] = '5061'
     data['ws_support'] = 1
     data['ws_port'] = '10061'
-    data['wss_support'] = 1
+    data['wss_support'] = 0
     data['wss_port'] = '10062'
     return data
 
@@ -141,11 +141,12 @@ modparam("proto_tcp", "tcp_port", {tcp_port})"""
     if data['ws_support']:
         ws_code = create_proto_support_code( public_ipv4, 'ws', ws_port)
         replacements['ws_support'] = ws_code
-        replacements['ws_load_module'] = f"""loadmodule "proto_ws.so"""
+        replacements['ws_load_module'] = f"""loadmodule "proto_ws.so"
+"""
     if data['wss_support']:
         wss_code = create_proto_support_code( public_ipv4, 'wss', wss_port)
         replacements['wss_support'] = wss_code
-        replacements['wss_load_module'] = f"""loadmodule "proto_wss.so
+        replacements['wss_load_module'] = f"""loadmodule "proto_wss.so"
 modparam("proto_wss", "certificate", "{cert_dir}/cert.pem")
 modparam("proto_wss", "private_key", "{cert_dir}/key.pem")
 modparam("proto_wss", "verify_cert", 0)"""
