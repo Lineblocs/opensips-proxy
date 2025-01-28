@@ -381,17 +381,30 @@ route{
 	# scenario to handle calls from either subscribers or from SIPml5 agents
 	if (is_registered("location","$fu") || $hdr(User-Agent) == "IM-client/OMA1.0 sipML5-v1.2016.03.04") 
 	{
-		xlog("RECEIVED CALL FROM EXTENSION\r\n");
-		route(INTERNAL_EXTENSION_ROUTING);
-		exit;
+		if ($proto =~ "ws") {
+			xlog("RECEIVED CALL FROM EXTENSION (using ws test routing)\r\n");
+			route(WS_TEST_ROUTING);
+			exit;
+
+		} else {
+			xlog("RECEIVED CALL FROM EXTENSION\r\n");
+			route(INTERNAL_EXTENSION_ROUTING);
+			exit;
+		}
 	}
 
 	# handle internal subscriber workflow or calls received from DID numbers
 	if (is_method("INVITE")) 
 	{
-		xlog("RECEIVED CALL FROM PSTN\r\n");
-		route(PSTN_ROUTING);
-		exit;
+		if ($proto =~ "ws") {
+			xlog("RECEIVED CALL FROM EXTENSION (using ws test routing)\r\n");
+			route(WS_TEST_ROUTING);
+			exit;
+		} else {
+			xlog("RECEIVED CALL FROM PSTN\r\n");
+			route(PSTN_ROUTING);
+			exit;
+		}
 	}
 
 	route(RELAY);
@@ -440,6 +453,61 @@ route[RELAY] {
 				append_to_reply("a=rtcp-mux\r\n");
 			}
 
+			rtpproxy_offer("froc", "{{{public_ipv4}}}");
+		}
+	
+		if (lookup("location","m")) 
+		{
+			#xlog("request uri is now $ru");
+		}
+	}
+
+	# removing the rtpproxy session
+	if(is_method("CANCEL|BYE"))
+	{
+		#xlog("L_NOTICE", "route sending BYE to other end..  info from: $fu, to: $tu");
+		rtpproxy_unforce();
+	}
+
+    if (!t_relay()) 
+	{
+      send_reply(500,"Internal Error");
+    };
+
+	route(POST_CALL_PROC_ROUTE);
+}
+
+route[WS_TEST_ROUTING] {
+
+	# check if this request is a invite
+	
+	if (is_method("INVITE")) 
+	{
+		# for each branch we will call the function below
+		
+		t_on_branch("PER_BRANCH_OPS");
+
+		# for each reply we will call the function below
+		
+		t_on_reply("HANDLE_NAT");
+
+		# if the call was not completed, so failure route
+		t_on_failure("MISSED_CALL");
+
+
+		if(nat_uac_test(127))
+		{
+			# user identified as behing a nat
+			#xlog("we are on route relay, user behind nat");
+			fix_nated_contact();
+		}
+
+		# if we have an application/sdp on our body, so we execute
+        # the rtpproxy_offer
+		if(has_body("application/sdp"))
+		{
+			#xlog("we have sdp on this $rm");
+			# check if the RTP proxy was already selected or not
 			rtpproxy_offer("froc", "{{{public_ipv4}}}");
 		}
 	

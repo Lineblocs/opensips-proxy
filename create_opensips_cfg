@@ -14,11 +14,11 @@ def check_support(param):
 
 def create_proto_support_code( public_ipv4, proto, proto_port, proto_autoscaling=False ):
     if not proto_autoscaling:
-        return f"""listen={proto}:{public_ipv4}:{udp_port}"""
+        return f"""listen={proto}:{public_ipv4}:{proto_port}"""
 
     profile = f"PROFILE_{proto.upper()}"
     workers = f"{proto.upper()}_workers="
-    return f"""listen={proto}:{public_ipv4}:{udp_port} use_auto_scaling_profile {profile}
+    return f"""listen={proto}:{public_ipv4}:{proto_port} use_auto_scaling_profile {profile}
  
 """
 
@@ -53,7 +53,7 @@ def get_db_params():
     data['udp_autoscaling'] = 1
     data['tcp_support'] = 0
     data['tcp_port'] = '5080'
-    data['tcp_autoscaling'] = 1
+    data['tcp_autoscaling'] = 0
     data['tls_support'] = 0
     data['tls_port'] = '5061'
     data['ws_support'] = 1
