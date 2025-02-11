@@ -468,6 +468,7 @@ route[INTERNAL_MS_ROUTING] {
 	if ($hdr(X-LineBlocs-Key) != "{{{lineblocs_key}}}") { #internal asterisk
 		xlog("invalid routing key received.\r\n");
 		remove_hf("X-LineBlocs-Key");
+		send_reply(401, "Auth key is invalid.");
 		exit;
 	}
 
