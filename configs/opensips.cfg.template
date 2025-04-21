@@ -1,7 +1,7 @@
 #
 # Lineblocs routing scripts
 #  
-# made with OpenSIPS 3.x
+# designed for OpenSIPS Solutions
 #
 
 
@@ -50,12 +50,6 @@ timer_workers = 2 use_auto_scaling_profile PROFILE_TIMER
 # TLS support
 #listen=tcp:127.0.0.1:5080
 {{{tcp_support}}}
-
-# WS support
-{{{ws_support}}}
-
-# WSS support
-{{{wss_support}}}
 
 listen=hep_udp:{{{public_ipv4}}}:9060
 
@@ -184,17 +178,8 @@ modparam("acc", "detect_direction", 0)
 #modparam("proto_tcp", "tcp_port", 5065)
 {{{tcp_load_module}}}
 
-# WS protocol
-#loadmodule "proto_ws.so"
-{{{ws_load_module}}}
 
-#loadmodule "proto_wss.so"
-{{{wss_load_module}}}
 
-# TLS configuration
-#modparam("proto_wss", "certificate", "/path/to/cert.pem")
-#modparam("proto_wss", "private_key", "/path/to/key.pem")
-#modparam("proto_wss", "verify_cert", 0)
 
 # ----- multi-module params -----
 modparam("alias_db|auth_db|usrloc", "use_domain", 1)
@@ -423,23 +408,11 @@ route[RELAY] {
 		}
 
 		# if we have an application/sdp on our body, so we execute
-        # the rtpproxy_offer
+                # the rtpproxy_offer
 		if(has_body("application/sdp"))
 		{
 			#xlog("we have sdp on this $rm");
 			# check if the RTP proxy was already selected or not
-			if ($proto =~ "ws") {
-				xlog("WebSocket connection - updating SDP for WebRTC\n");
-										
-				append_to_reply("m=audio 32884 UDP/TLS/RTP/SAVPF 111 63 9 0 8 13 110 126\r\n");
-				append_to_reply("a=setup:actpass\r\n");
-				append_to_reply("a=fingerprint:sha-256 AC:D6:69:C4:D7:8B:C5:A1:D5:48:EF:74:7C:67:23:9E:EE:5E:46:94:CB:B8:B6:F6:04:AB:E8:0F:1C:C3:B7:DB\r\n");
-				append_to_reply("a=ice-ufrag:rl1wX7nA\r\n");
-				append_to_reply("a=ice-pwd:nDsg1dRi0QaiWIxA\r\n");
-				append_to_reply("a=ice-options:trickle\r\n");
-				append_to_reply("a=rtcp-mux\r\n");
-			}
-
 			rtpproxy_offer("froc", "{{{public_ipv4}}}");
 		}
 	
@@ -468,7 +441,6 @@ route[INTERNAL_MS_ROUTING] {
 	if ($hdr(X-LineBlocs-Key) != "{{{lineblocs_key}}}") { #internal asterisk
 		xlog("invalid routing key received.\r\n");
 		remove_hf("X-LineBlocs-Key");
-		send_reply(401, "Auth key is invalid.");
 		exit;
 	}
 
@@ -1105,18 +1077,6 @@ route[PSTN_QUERY_ROUTE] {
 		if(has_body("application/sdp"))
 		{
 			#xlog("we have sdp on this $rm");
-			if ($proto =~ "ws") {
-				xlog("WebSocket connection - updating SDP for WebRTC\n");
-										
-				append_to_reply("m=audio 32884 UDP/TLS/RTP/SAVPF 111 63 9 0 8 13 110 126\r\n");
-				append_to_reply("a=setup:actpass\r\n");
-				append_to_reply("a=fingerprint:sha-256 AC:D6:69:C4:D7:8B:C5:A1:D5:48:EF:74:7C:67:23:9E:EE:5E:46:94:CB:B8:B6:F6:04:AB:E8:0F:1C:C3:B7:DB\r\n");
-				append_to_reply("a=ice-ufrag:rl1wX7nA\r\n");
-				append_to_reply("a=ice-pwd:nDsg1dRi0QaiWIxA\r\n");
-				append_to_reply("a=ice-options:trickle\r\n");
-				append_to_reply("a=rtcp-mux\r\n");
-			}
-			
 			rtpproxy_offer("froc", "{{{public_ipv4}}}");
 		}
 	
