@@ -150,6 +150,15 @@ modparam("rtpproxy", "rtpproxy_autobridge", 1)
 modparam("rtpproxy", "rtpproxy_retr", 2)
 modparam("rtpproxy", "nortpproxy_str", "a=sdpmangled:yes\r\n")
 
+# single rtproxy
+modparam("rtpengine", "rtpengine_sock", "udp:{{{rtpproxy_ipv4}}}:12221")
+# multiple rtproxies for LB
+modparam("rtpengine", "rtpengine_sock", "udp:localhost:12221 udp:localhost:12222")
+modparam("rtpengine", "db_url", "mysql://{{{db_user}}}:{{{db_pass}}}@{{{db_host}}}/{{{db_opensips}}}")
+modparam("rtpengine", "db_table", "mysql://{{{db_user}}}:{{{db_pass}}}@{{{db_host}}}/{{{db_opensips}}}")
+modparam("rtpengine", "db_table", "rtpengine_sockets")
+modparam("rtpengine", "socket_column", "rtpengine_sock")
+
 
 loadmodule "uac.so"
 
@@ -414,6 +423,7 @@ route[RELAY] {
 			#xlog("we have sdp on this $rm");
 			# check if the RTP proxy was already selected or not
 			rtpproxy_offer("froc", "{{{public_ipv4}}}");
+			#rtpengine_offer("force trust-address symmetric replace-origin replace-session-connection ICE=force RTP/SAVPF", "{{{public_ipv4}}}");
 		}
 	
 		if (lookup("location","m")) 
@@ -427,6 +437,7 @@ route[RELAY] {
 	{
 		#xlog("L_NOTICE", "route sending BYE to other end..  info from: $fu, to: $tu");
 		rtpproxy_unforce();
+		#rtpengine_delete();
 	}
 
     if (!t_relay()) 
@@ -617,6 +628,7 @@ route[RELAY_MS_TO_PSTN] {
 		{
 			#xlog("we have sdp on this $rm");
 			rtpproxy_offer("froc", "{{{public_ipv4}}}");
+			#rtpengine_offer("force trust-address symmetric replace-origin replace-session-connection ICE=force RTP/SAVPF", "{{{public_ipv4}}}");
 		}
 	
 		if (lookup("location","m")) 
@@ -630,6 +642,7 @@ route[RELAY_MS_TO_PSTN] {
 	{
 		#xlog("L_NOTICE", "route sending BYE to other end..  info from: $fu, to: $tu");
 		rtpproxy_unforce();
+		#rtpengine_delete();
 	}
 
 	if (!t_relay()) 
@@ -647,6 +660,7 @@ route[BYE_QUERY_ROUTE] {
 	if(is_method("CANCEL|BYE"))
 	{
 		rtpproxy_unforce();
+		#rtpengine_delete();
 	}
 
 	if (!t_relay()) 
@@ -776,6 +790,187 @@ route[TRUNK_ASSIGNED] {
 	append_hf("X-LineBlocs-Direction: outgoing-proxy-trunk\r\n");
 	append_hf("X-Lineblocs-Trunk-SourceIP: $fd\r\n");
 	route(RELAY);
+}
+
+# Caller NAT detection route
+route[NATDETECT] {
+	force_rport();
+	if (nat_uac_test("19")) {
+		if (is_method("REGISTER")) {
+			fix_nated_register();
+		} else if (is_first_hop()) {
+			set_contact_alias();
+		}
+		setflag({{{FLT_NATS}}});
+	}
+	return;
+}
+
+# NAT handling
+route[NATMANAGE] {
+	if (is_request()) {
+		if (has_totag()) {
+			if (check_route_param("nat=yes")) {
+				setbflag({{{FLB_NATB}}});
+			}
+
+			if (check_route_param("rtp=bridge")) {
+				setbflag({{{FLB_BRIDGE}}});
+			}
+
+			if (check_route_param("rtp=ws")) {
+				setbflag({{{FLB_RTPWS}}});
+			}
+		}
+	}
+
+	if (!isbflagset({{{FLB_BRIDGE}}})) {
+		return;
+	}
+
+	if (
+		!(isflagset({{{FLT_NATS}}})
+		|| isbflagset({{{FLB_NATB}}})
+		|| isbflagset({{{FLB_RTPWS}}})
+	)) {
+		return;
+	}
+
+	$xavp(r=>$T_branch_idx) = "replace-origin replace-session-connection";
+
+	if (!nat_uac_test("8")) {
+		$xavp(r=>$T_branch_idx) = $xavp(r=>$T_branch_idx) + " trust-address";
+	}
+
+
+	if (is_request()) {
+		if (!has_totag()) {
+			if (!t_is_failure_route()) {
+				$avp(extra_id) = @via[1].branch + $T_branch_idx;
+				$xavp(r=>$T_branch_idx) = $xavp(r=>$T_branch_idx) + " via-branch=extra";
+			}
+		}
+	}
+
+	if (is_reply()) {
+		$avp(extra_id) = @via[2].branch + $T_branch_idx;
+		$xavp(r=>$T_branch_idx) = $xavp(r=>$T_branch_idx) + " via-branch=extra";
+	}
+
+	if (isbflagset({{{FLB_RTPWS}}})) {
+		if ($proto =~ "ws") { # web --> SIP
+			$xavp(r=>$T_branch_idx) = $xavp(r=>$T_branch_idx) + " rtcp-mux-demux DTLS=off SDES-off ICE=remove RTP/AVP";
+		} else { # SIP --> web
+			$xavp(r=>$T_branch_idx) = $xavp(r=>$T_branch_idx) + " rtcp-mux-offer generate-mid DTLS=passive SDES-off ICE=force RTP/SAVPF";
+		}
+	} else {
+		if ($proto =~ "ws") { # web --> web
+			$xavp(r=>$T_branch_idx) = $xavp(r=>$T_branch_idx) + " generate-mid DTLS=passive SDES-off ICE=force";
+		} else {
+			$xavp(r=>$T_branch_idx) = $xavp(r=>$T_branch_idx) + " ICE=remove";
+		}
+	}
+
+	xlog("L_INFO", "NATMANAGE branch_id:$T_branch_idx ruri: $ru, method:$rm, status:$rs, extra_id: $avp(extra_id), rtpengine_manage: $xavp(r=>$T_branch_idx)\n");
+
+	rtpengine_manage($xavp(r=>$T_branch_idx));
+
+	if (is_request()) {
+		if (!has_totag()) {
+			if (t_is_branch_route()) {
+				if (isbflagset({{{FLB_NATB}}})) {
+					add_rr_param(";nat=yes");
+				}
+
+				if (isbflagset({{{FLB_BRIDGE}}})) {
+					add_rr_param(";rtp=bridge");
+				}
+
+				if (isbflagset({{{FLB_RTPWS}}})) {
+					add_rr_param(";rtp=ws");
+				}
+			}
+		}
+	}
+
+	if (is_reply()) {
+		if (isbflagset({{{FLB_NATB}}})) {
+			if (is_first_hop()) {
+				if (af == INET) {
+					set_contact_alias();
+				}
+			}
+		}
+	}
+	return;
+}
+
+# RTPProxy control and signaling updates for NAT traversal
+route[NATMANAGE_SIP] {
+        if (is_request()) {
+                if(has_totag()) {
+                        if(check_route_param("nat=yes")) {
+                                setbflag({{{FLB_NATB}}});
+                        }
+                }
+        }
+        if (!(isflagset({{{FLT_NATS}}}) || isbflagset({{{FLB_NATB}}}))) return;
+
+        if (is_request()) {
+                if (!has_totag()) {
+                        if(t_is_branch_route()) {
+                                add_rr_param(";nat=yes");
+                        }
+                }
+        }
+        if (is_reply()) {
+                if(isbflagset({{{FLB_NATB}}})) {
+                        if(is_first_hop())
+                                set_contact_alias();
+                }
+        }
+
+        return;
+}
+
+route[BRIDGING] {
+	if (!has_totag()) {
+		if ($proto =~ "ws" && !($ru =~ "transport=ws")) { # Coming from WS, NOT to WS
+			setbflag({{{FLB_RTPWS}}}); # Need bridging
+		} else if (!($proto =~ "ws") && $ru =~ "transport=ws") { # Coming from NOT WS, going to WS
+			setbflag({{{FLB_RTPWS}}}); # Need bridging
+		}
+	}
+}
+
+route[RTPENGINE_ONFAIL] {
+	$avp(extra_id) = @via[1].branch + $T_branch_idx;
+	rtpengine_delete("via-branch=extra");
+}
+
+# manage outgoing branches
+branch_route[MANAGE_BRANCH] {
+	xlog("L_INFO", "MANAGE_BRANCH: New branch [$T_branch_idx] to $ru\n");
+
+	t_on_branch_failure("rtpengine");
+
+	route(BRIDGING);
+	route(NATMANAGE);
+}
+
+# manage incoming replies
+onreply_route[MANAGE_REPLY] {
+	xdbg("incoming reply\n");
+	if (status =~ "[12][0-9][0-9]") {
+		if (($proto == "ws" || $proto == "wss") || $ru =~ "transport=ws") {
+			route(NATMANAGE);
+		} else {
+			route(NATMANAGE_SIP);
+			if (has_body("application/sdp")) {
+                rtpengine_manage();
+        	}
+		}
+	}
 }
 
 route[CALL_ACTION] {
@@ -1078,6 +1273,7 @@ route[PSTN_QUERY_ROUTE] {
 		{
 			#xlog("we have sdp on this $rm");
 			rtpproxy_offer("froc", "{{{public_ipv4}}}");
+			#rtpengine_offer("force trust-address symmetric replace-origin replace-session-connection ICE=force RTP/SAVPF", "{{{public_ipv4}}}");
 		}
 	
 	}
@@ -1086,6 +1282,7 @@ route[PSTN_QUERY_ROUTE] {
 	if(is_method("CANCEL|BYE"))
 	{
 		rtpproxy_unforce();
+		#rtpengine_delete();
 	}
 
 	if (!t_relay()) 
@@ -1124,6 +1321,7 @@ route[MEDIASERVICE_QUERY_ROUTE] {
 		if(has_body("application/sdp"))
 		{
 			rtpproxy_offer("froc", "{{{public_ipv4}}}");
+			#rtpengine_offer("force trust-address symmetric replace-origin replace-session-connection ICE=force RTP/SAVPF", "{{{public_ipv4}}}");
 		}
 	}
 
@@ -1131,6 +1329,7 @@ route[MEDIASERVICE_QUERY_ROUTE] {
 	if(is_method("CANCEL|BYE"))
 	{
 		rtpproxy_unforce();
+		#rtpengine_delete();
 	}
 
 	if (!t_relay()) 
@@ -1170,6 +1369,7 @@ route[ENDPOINT_QUERY_ROUTE] {
 		if(has_body("application/sdp"))
 		{
 			rtpproxy_offer("froc", "{{{public_ipv4}}}");
+			#rtpengine_offer("force trust-address symmetric replace-origin replace-session-connection ICE=force RTP/SAVPF", "{{{public_ipv4}}}");
 		}
 	}
 
@@ -1177,6 +1377,7 @@ route[ENDPOINT_QUERY_ROUTE] {
 	if(is_method("CANCEL|BYE"))
 	{
 		rtpproxy_unforce();
+		#rtpengine_delete();
 	}
 
 	if (!t_relay()) 
@@ -1201,9 +1402,11 @@ onreply_route[HANDLE_NAT] {
 	if(is_method("ACK") && has_body("application/sdp"))
 	{
 		rtpproxy_answer("froc", "{{{public_ipv4}}}");
+		#rtpengine_answer("force trust-address symmetric replace-origin replace-session-connection ICE=force RTP/SAVPF", "{{{public_ipv4}}}");
 	} else if(has_body("application/sdp")) {
 		# offering rtpproxy on a non ack message
 		rtpproxy_offer("froc", "{{{public_ipv4}}}");	
+		#rtpengine_offer("force trust-address symmetric replace-origin replace-session-connection ICE=force RTP/SAVPF", "{{{public_ipv4}}}");
 	}
 
 	# here we try to identify if the user is behind a nat again
@@ -1224,9 +1427,11 @@ onreply_route[PSTN_HANDLE_NAT] {
 	if(is_method("ACK") && has_body("application/sdp"))
 	{
 		rtpproxy_answer("froc", "{{{public_ipv4}}}");
+		#rtpengine_answer("force trust-address symmetric replace-origin replace-session-connection ICE=force RTP/SAVPF", "{{{public_ipv4}}}");
 	} else if(has_body("application/sdp")) {
 		# offering rtpproxy on a non ack message
 		rtpproxy_offer("froc", "{{{public_ipv4}}}");	
+		#rtpengine_offer("force trust-address symmetric replace-origin replace-session-connection ICE=force RTP/SAVPF", "{{{public_ipv4}}}");
 	}
 
 	# here we try to identify if the user is behind a nat again
@@ -1281,7 +1486,8 @@ route[RELAY_TO_USER_TRUNK] {
 		if(has_body("application/sdp"))
 		{
 			#xlog("we have sdp on this $rm");
-			rtpproxy_offer("froc", "{{{public_ipv4}}}");
+			#rtpproxy_offer("froc", "{{{public_ipv4}}}");
+			rtpengine_offer("force trust-address symmetric replace-origin replace-session-connection ICE=force RTP/SAVPF", "{{{public_ipv4}}}");
 		}
 	}
 
@@ -1289,6 +1495,7 @@ route[RELAY_TO_USER_TRUNK] {
 	if(is_method("CANCEL|BYE"))
 	{
 		rtpproxy_unforce();
+		#rtpengine_delete();
 	}
 
 	if (!t_relay()) 

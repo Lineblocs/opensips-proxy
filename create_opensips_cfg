@@ -60,6 +60,14 @@ def get_db_params():
     data['ws_port'] = '10061'
     data['wss_support'] = 0
     data['wss_port'] = '10062'
+    data['FLT_NATS'] = 5
+    data['FLB_NATB'] = 6
+    data['FLB_NATSIPPING'] = 7
+    data['FLB_RTPWS'] = 8
+    data['FLB_IPV6'] = 9
+    data['FLB_V4V6'] = 10
+    data['FLB_BRIDGE'] = 11
+
     return data
 
 def generate_carrier_key(length=16):
