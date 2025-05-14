@@ -958,6 +958,12 @@ branch_route[MANAGE_BRANCH] {
 	route(NATMANAGE);
 }
 
+# Manage outgoing branches
+branch_route[MANAGE_BRANCH_SIP] {
+        xdbg("new branch [$T_branch_idx] to $ru\n");
+        route(NATMANAGE_SIP);
+}
+
 # manage incoming replies
 onreply_route[MANAGE_REPLY] {
 	xdbg("incoming reply\n");
