@@ -70,6 +70,9 @@ loadmodule "signaling.so"
 #### StateLess module
 loadmodule "sl.so"
 
+#### flags module for is_setflag and setflag
+loadmodule "flags.so"
+
 #### Transaction Module
 loadmodule "tm.so"
 modparam("tm", "fr_timeout", 5)
@@ -150,6 +153,7 @@ modparam("rtpproxy", "rtpproxy_autobridge", 1)
 modparam("rtpproxy", "rtpproxy_retr", 2)
 modparam("rtpproxy", "nortpproxy_str", "a=sdpmangled:yes\r\n")
 
+loadmodule "rtpengine.so"
 # single rtproxy
 modparam("rtpengine", "rtpengine_sock", "udp:{{{rtpproxy_ipv4}}}:12221")
 # multiple rtproxies for LB
@@ -175,6 +179,14 @@ modparam("acc", "detect_direction", 0)
 
 #### UDP protocol
 #loadmodule "proto_udp.so"
+# load our certificate management module
+loadmodule "tls_mgm.so"
+
+#load all protocol modules
+loadmodule "proto_tls.so"
+loadmodule "proto_wss.so"
+loadmodule "proto_ws.so"
+
 {{{udp_load_module}}}
 
 ## TCP protocol
@@ -187,8 +199,16 @@ modparam("acc", "detect_direction", 0)
 #modparam("proto_tcp", "tcp_port", 5065)
 {{{tcp_load_module}}}
 
+# set listeners for all protocols
+listen=ws:127.0.0.1:4442
+listen=wss:127.0.0.1:4443
+listen=tls:127.0.0.1:5061
 
+# modparam our certificate information
+modparam("tls_mgm", "certificate","/certs/cert.pem")
+modparam("tls_mgm", "private_key","/certs/privkey.pem")
 
+loadmodule "alias_db.so"
 
 # ----- multi-module params -----
 modparam("alias_db|auth_db|usrloc", "use_domain", 1)
@@ -798,7 +818,8 @@ route[NATDETECT] {
 	if (nat_uac_test("19")) {
 		if (is_method("REGISTER")) {
 			fix_nated_register();
-		} else if (is_first_hop()) {
+		} else if (pv_count("$via") == 1) {
+
 			set_contact_alias();
 		}
 		setflag({{{FLT_NATS}}});
@@ -808,106 +829,106 @@ route[NATDETECT] {
 
 # NAT handling
 route[NATMANAGE] {
-	if (is_request()) {
-		if (has_totag()) {
-			if (check_route_param("nat=yes")) {
-				setbflag({{{FLB_NATB}}});
-			}
+    if ($msg.is_request) {
+        if (has_totag()) {
+            if (pv_check_route("nat=yes")) {
+                setflag({{{FL_NATB}}});
+            }
 
-			if (check_route_param("rtp=bridge")) {
-				setbflag({{{FLB_BRIDGE}}});
-			}
+            if (pv_check_route("rtp=bridge")) {
+                setflag({{{FL_BRIDGE}}});
+            }
 
-			if (check_route_param("rtp=ws")) {
-				setbflag({{{FLB_RTPWS}}});
-			}
-		}
-	}
+            if (pv_check_route("rtp=ws")) {
+                setflag({{{FL_RTPWS}}});
+            }
+        }
+    }
 
-	if (!isbflagset({{{FLB_BRIDGE}}})) {
-		return;
-	}
+    if (!is_setflag({{{FL_BRIDGE}}})) {
+        return;
+    }
 
-	if (
-		!(isflagset({{{FLT_NATS}}})
-		|| isbflagset({{{FLB_NATB}}})
-		|| isbflagset({{{FLB_RTPWS}}})
-	)) {
-		return;
-	}
+    if (
+        !(is_setflag({{{FL_NATS}}})
+        || is_setflag({{{FL_NATB}}})
+        || is_setflag({{{FL_RTPWS}}})
+    )) {
+        return;
+    }
 
-	$xavp(r=>$T_branch_idx) = "replace-origin replace-session-connection";
+    # Simulate XAVP using AVP and a structured name
+    $avp("$T_branch_idx:r") = "replace-origin replace-session-connection";
 
-	if (!nat_uac_test("8")) {
-		$xavp(r=>$T_branch_idx) = $xavp(r=>$T_branch_idx) + " trust-address";
-	}
+    if (!nat_uac_test("8")) {
+        $avp("$T_branch_idx:r") = $avp("$T_branch_idx:r") + " trust-address";
+    }
 
+    if ($msg.is_request) {
+        if (!has_totag()) {
+            if (!t_is_failure()) {
+                #$avp(extra_id) = $(via[1]{branch}) + $T_branch_idx;
+                $avp("$T_branch_idx:r") = $avp("$T_branch_idx:r") + " via-branch=extra";
+            }
+        }
+    }
 
-	if (is_request()) {
-		if (!has_totag()) {
-			if (!t_is_failure_route()) {
-				$avp(extra_id) = @via[1].branch + $T_branch_idx;
-				$xavp(r=>$T_branch_idx) = $xavp(r=>$T_branch_idx) + " via-branch=extra";
-			}
-		}
-	}
+    if (!$msg.is_request) {
+        #$avp(extra_id) = $(via[2]{branch}) + $T_branch_idx;
+        $avp("$T_branch_idx:r") = $avp("$T_branch_idx:r") + " via-branch=extra";
+    }
 
-	if (is_reply()) {
-		$avp(extra_id) = @via[2].branch + $T_branch_idx;
-		$xavp(r=>$T_branch_idx) = $xavp(r=>$T_branch_idx) + " via-branch=extra";
-	}
+    if (is_setflag({{{FL_RTPWS}}})) {
+        if ($proto =~ "ws") { # web --> SIP
+            $avp("$T_branch_idx:r") = $avp("$T_branch_idx:r") + " rtcp-mux-demux DTLS=off SDES-off ICE=remove RTP/AVP";
+        } else { # SIP --> web
+            $avp("$T_branch_idx:r") = $avp("$T_branch_idx:r") + " rtcp-mux-offer generate-mid DTLS=passive SDES-off ICE=force RTP/SAVPF";
+        }
+    } else {
+        if ($proto =~ "ws") { # web --> web
+            $avp("$T_branch_idx:r") = $avp("$T_branch_idx:r") + " generate-mid DTLS=passive SDES-off ICE=force";
+        } else {
+            $avp("$T_branch_idx:r") = $avp("$T_branch_idx:r") + " ICE=remove";
+        }
+    }
 
-	if (isbflagset({{{FLB_RTPWS}}})) {
-		if ($proto =~ "ws") { # web --> SIP
-			$xavp(r=>$T_branch_idx) = $xavp(r=>$T_branch_idx) + " rtcp-mux-demux DTLS=off SDES-off ICE=remove RTP/AVP";
-		} else { # SIP --> web
-			$xavp(r=>$T_branch_idx) = $xavp(r=>$T_branch_idx) + " rtcp-mux-offer generate-mid DTLS=passive SDES-off ICE=force RTP/SAVPF";
-		}
-	} else {
-		if ($proto =~ "ws") { # web --> web
-			$xavp(r=>$T_branch_idx) = $xavp(r=>$T_branch_idx) + " generate-mid DTLS=passive SDES-off ICE=force";
-		} else {
-			$xavp(r=>$T_branch_idx) = $xavp(r=>$T_branch_idx) + " ICE=remove";
-		}
-	}
+    xlog("L_INFO", "NATMANAGE branch_id:$T_branch_idx ruri: $ru, method:$rm, status:$rs, rtpengine_manage: $avp($T_branch_idx:r)\n");
 
-	xlog("L_INFO", "NATMANAGE branch_id:$T_branch_idx ruri: $ru, method:$rm, status:$rs, extra_id: $avp(extra_id), rtpengine_manage: $xavp(r=>$T_branch_idx)\n");
+    rtpengine_manage($avp("$T_branch_idx:r"));
 
-	rtpengine_manage($xavp(r=>$T_branch_idx));
+    if ($msg.is_request) {
+        if (!has_totag()) {
+            if (t_is_branch()) {
+                if (is_setflag({{{FL_NATB}}})) {
+                    append_hf("Record-Route: <sip:$sel(alias);nat=yes>\r\n");
+                }
 
-	if (is_request()) {
-		if (!has_totag()) {
-			if (t_is_branch_route()) {
-				if (isbflagset({{{FLB_NATB}}})) {
-					add_rr_param(";nat=yes");
-				}
+                if (is_setflag({{{FL_BRIDGE}}})) {
+                    append_hf("Record-Route: <sip:$sel(alias);rtp=bridge>\r\n");
+                }
 
-				if (isbflagset({{{FLB_BRIDGE}}})) {
-					add_rr_param(";rtp=bridge");
-				}
+                if (is_setflag({{{FL_RTPWS}}})) {
+                    append_hf("Record-Route: <sip:$sel(alias);rtp=ws>\r\n");
+                }
+            }
+        }
+    }
 
-				if (isbflagset({{{FLB_RTPWS}}})) {
-					add_rr_param(";rtp=ws");
-				}
-			}
-		}
-	}
-
-	if (is_reply()) {
-		if (isbflagset({{{FLB_NATB}}})) {
-			if (is_first_hop()) {
-				if (af == INET) {
-					set_contact_alias();
-				}
-			}
-		}
-	}
-	return;
+    if (!$msg.is_request) {
+        if (is_setflag({{{FL_NATB}}})) {
+            if (pv_count("$via") == 1) {
+                if ($af == 2) { # INET
+                    set_contact_alias();
+                }
+            }
+        }
+    }
+    return;
 }
 
 # RTPProxy control and signaling updates for NAT traversal
 route[NATMANAGE_SIP] {
-        if (is_request()) {
+        if ($msg.is_request) {
                 if(has_totag()) {
                         if(check_route_param("nat=yes")) {
                                 setbflag({{{FLB_NATB}}});
@@ -916,7 +937,7 @@ route[NATMANAGE_SIP] {
         }
         if (!(isflagset({{{FLT_NATS}}}) || isbflagset({{{FLB_NATB}}}))) return;
 
-        if (is_request()) {
+        if ($msg.is_request) {
                 if (!has_totag()) {
                         if(t_is_branch_route()) {
                                 add_rr_param(";nat=yes");
@@ -924,10 +945,11 @@ route[NATMANAGE_SIP] {
                 }
         }
         if (is_reply()) {
-                if(isbflagset({{{FLB_NATB}}})) {
-                        if(is_first_hop())
-                                set_contact_alias();
-                }
+			if(isbflagset({{{FLB_NATB}}})) {
+				if (pv_count("$via") == 1) {
+					set_contact_alias();
+				}
+			}
         }
 
         return;
@@ -944,15 +966,15 @@ route[BRIDGING] {
 }
 
 route[RTPENGINE_ONFAIL] {
-	$avp(extra_id) = @via[1].branch + $T_branch_idx;
+	#$avp(extra_id) = @via[1].branch + $T_branch_idx;
 	rtpengine_delete("via-branch=extra");
 }
 
 # manage outgoing branches
 branch_route[MANAGE_BRANCH] {
-	xlog("L_INFO", "MANAGE_BRANCH: New branch [$T_branch_idx] to $ru\n");
+	xlog("L_INFO", "MANAGE_BRANCH: ru=$ru\n");
 
-	t_on_branch_failure("rtpengine");
+	#t_on_branch_failure("rtpengine");
 
 	route(BRIDGING);
 	route(NATMANAGE);
