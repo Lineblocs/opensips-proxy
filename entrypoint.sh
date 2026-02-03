@@ -64,16 +64,12 @@ rm -rf $CFG_PATH.temp
 ## debugging only
 #tail -f /etc/*-release
 
-OPENSIPS_ARGS="-FE"
+OPENSIPS_ARGS="-F -m 512"
 # run sampo API server in background
 echo "Starting sampo API server"
 socat -d TCP-LISTEN:1042,reuseaddr,fork,pf=ip4 \
                     exec:/${APP}/${APP}.sh &
 
-
-echo "Waiting for RTPproxies to be up before starting OpenSIPs.."
-
-sleep 30;
 
 # start opensips server
 /usr/sbin/opensips ${OPENSIPS_ARGS}
