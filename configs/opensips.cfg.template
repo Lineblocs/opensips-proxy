@@ -110,14 +110,16 @@ loadmodule "auth_db.so"
 # ----- auth_db params -----
 modparam("auth_db", "calculate_ha1", yes)
 modparam("auth_db", "password_column", "password")
-modparam("auth_db", "db_url","mysql://lineblocs:E0N798KU5TEh@172.31.15.129/opensips")
+#modparam("auth_db", "db_url","mysql://lineblocs:E0N798KU5TEh@172.31.15.129/opensips")
+modparam("auth_db", "db_url","mysql://{{{db_user}}}:{{{db_pass}}}@{{{db_host}}}/{{{db_opensips}}}")
 modparam("auth_db", "load_credentials", "")
 modparam("auth_db", "use_domain", 1)
 
 
 loadmodule "domain.so"
 # ----- domain params -----
-modparam("domain", "db_url", "mysql://lineblocs:E0N798KU5TEh@172.31.15.129/opensips")
+#modparam("domain", "db_url", "mysql://lineblocs:E0N798KU5TEh@172.31.15.129/opensips")
+modparam("domain", "db_url", "mysql://{{{db_user}}}:{{{db_pass}}}@{{{db_host}}}/{{{db_opensips}}}")
 modparam("domain", "db_mode", 0)   # Use caching
 
 
@@ -135,7 +137,7 @@ loadmodule "sipmsgops.so"
 
 loadmodule "sqlops.so"
 # default URL
-modparam("sqlops","db_url","mysql://lineblocs:E0N798KU5TEh@172.31.15.129/opensips")
+modparam("sqlops","db_url","mysql://{{{db_user}}}:{{{db_pass}}}@{{{db_host}}}/{{{db_opensips}}}")
 
 
 #### FIFO Management Interface
@@ -148,7 +150,7 @@ modparam("mi_fifo", "fifo_mode", 0666)
 loadmodule "usrloc.so"
 modparam("usrloc", "nat_bflag", "NAT")
 modparam("usrloc", "db_mode",   0)
-modparam("usrloc", "db_url", "mysql://lineblocs:E0N798KU5TEh@172.31.15.129/opensips")
+modparam("usrloc", "db_url", "mysql://{{{db_user}}}:{{{db_pass}}}@{{{db_host}}}/{{{db_opensips}}}")
 
 #### REGISTRAR module
 loadmodule "registrar.so"
@@ -181,7 +183,7 @@ modparam("dialog", "db_mode", 0)
 
 ### RTPengine protocol
 loadmodule "rtpengine.so"
-modparam("rtpengine", "db_url", "mysql://lineblocs:E0N798KU5TEh@172.31.15.129/opensips")
+modparam("rtpengine", "db_url", "mysql://{{{db_user}}}:{{{db_pass}}}@{{{db_host}}}/{{{db_opensips}}}")
 #modparam("rtpengine", "rtpengine_sock", "udp:127.0.0.1:2223")
 
 loadmodule "uac.so"
@@ -227,7 +229,7 @@ loadmodule "options.so"
 
 ### CHANGEME mysql uri here if you do sip_capture()
 loadmodule "sipcapture.so"
-modparam("sipcapture", "db_url", "mysql://lineblocs:E0N798KU5TEh@172.31.15.129/")
+modparam("sipcapture", "db_url", "mysql://{{{db_user}}}:{{{db_pass}}}@{{{db_host}}}/{{{db_opensips}}}")
 modparam("sipcapture", "capture_on", 0)
 modparam("sipcapture", "hep_capture_on", 0)
 modparam("sipcapture", "hep_route", "CAPTURE_HEP_ROUTE")
@@ -540,7 +542,7 @@ route[RELAY] {
 
 
 route[INTERNAL_MS_ROUTING] {
-	if ($hdr(X-LineBlocs-Key) != "a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2") { #internal asterisk
+	if ($hdr(X-LineBlocs-Key) != "{{{lineblocs_key}}}") { #internal asterisk
 		xlog("invalid routing key received.\r\n");
 		remove_hf("X-LineBlocs-Key");
 		exit;
@@ -554,8 +556,8 @@ route[INTERNAL_MS_ROUTING] {
 		# set the SIP call ID
 		$var(body) = "callid=" + $hdr(Call-ID) + "&apiid=" + $hdr(X-LineBlocs-API-CallId) + "&source=" + $si;
 		$var(reg) = "/\+/%2B/g";
-		rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
-		async(rest_post("http://internals.lineblocs.com/call/setSIPCallID", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), MS_UPDATED_CALL_ID);
+		rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+		async(rest_post("{{{api_url}}}/call/setSIPCallID", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), MS_UPDATED_CALL_ID);
 		exit;
 	}
 	exit;
@@ -579,20 +581,20 @@ route[MS_UPDATED_CALL_ID] {
 		{
 			xlog("routing to extension...\r\n");
 
-			rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
-			async(rest_get("http://internals.lineblocs.com/user/incomingMediaServerValidation?source=$si&addr=$si", $var(body), $var(ct), $var(rcode)), INCOMING_MS_VALIDATE_1_ROUTE);
+			rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+			async(rest_get("{{{api_url}}}/user/incomingMediaServerValidation?source=$si&addr=$si", $var(body), $var(ct), $var(rcode)), INCOMING_MS_VALIDATE_1_ROUTE);
 			#route(RELAY);
 			exit;
 		}
 
 		if ($hdr(X-LineBlocs-Route-Type) == "pstn")
 		{
-			#xlog("L_NOTICE", "calling URL: http://internals.lineblocs.com/user/getPSTNProviderIP?from=$fU&to=$tU&domain=$hdr(X-LineBlocs-Domain)");
+			#xlog("L_NOTICE", "calling URL: {{{api_url}}}/user/getPSTNProviderIP?from=$fU&to=$tU&domain=$hdr(X-LineBlocs-Domain)");
 
 			xlog("routing to pstn...\r\n");
 
-			rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
-			async(rest_get("http://internals.lineblocs.com/user/incomingMediaServerValidation?source=$si&addr=$si", $var(body), $var(ct), $var(rcode)), INCOMING_MS_VALIDATE_2_ROUTE);
+			rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+			async(rest_get("{{{api_url}}}/user/incomingMediaServerValidation?source=$si&addr=$si", $var(body), $var(ct), $var(rcode)), INCOMING_MS_VALIDATE_2_ROUTE);
 			exit;
 		}
 	}
@@ -620,22 +622,22 @@ route[INTERNAL_EXTENSION_ROUTING] {
 					$var(query) = "number=" + $var(tonum) + "&domain=" + $fd + "&addr=" + $si;
 					$var(reg) = "/\+/%2B/g";
 
-					rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
-					async(rest_get("http://internals.lineblocs.com/user/verifyCallerByDomain?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), VERIFY_CALLER_ROUTE);
+					rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+					async(rest_get("{{{api_url}}}/user/verifyCallerByDomain?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), VERIFY_CALLER_ROUTE);
 					exit;
 			} else if ($var(reqnum)=~"^[0-9]{1,5}$") { ## call to another end device
 				$var(query) = "username=" + $fu + "&domain=" + $fd + "&routerip=" +  $avp(G_PUBLIC_IP) + "&addr=" + $si;
 				$var(reg) = "/\+/%2B/g";
 
-				rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
-				async(rest_get("http://internals.lineblocs.com/user/getUserAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), ENDPOINT_QUERY_ROUTE);
+				rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+				async(rest_get("{{{api_url}}}/user/getUserAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), ENDPOINT_QUERY_ROUTE);
 				exit;	
 			} else if ($var(reqnum)=~"^\*[1-9]+") { ## media service call
 				$var(query) = "username=" + $fu + "&domain=" + $fd + "&routerip=" +  $avp(G_PUBLIC_IP) + "&addr=" + $si;
 				$var(reg) = "/\+/%2B/g";
 
-				rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
-				async(rest_get("http://internals.lineblocs.com/user/getUserAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), MEDIASERVICE_QUERY_ROUTE);
+				rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+				async(rest_get("{{{api_url}}}/user/getUserAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), MEDIASERVICE_QUERY_ROUTE);
 				exit;
 			} else {
 				# dial pattern isnt unsupported
@@ -662,8 +664,8 @@ route[PSTN_ROUTING] {
 		$var(reg) = "/\+/%2B/g";
 
 		rest_append_hf("X-Lineblocs-Carrier-Auth: YMgGtcHS56NGp95_d6o6iQ");
-		rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
-		async(rest_get("http://internals.lineblocs.com/user/incomingDIDValidation?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), INCOMING_VALIDATION);
+		rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+		async(rest_get("{{{api_url}}}/user/incomingDIDValidation?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), INCOMING_VALIDATION);
 		exit;
 	}
 }
@@ -675,15 +677,15 @@ route[SIP_DEVICE_REGISTRATION] {
 		xlog("L_INFO", "Hosted trunk was matched\n");
 		$var(query) = "domain=" + $fd + "&ip=" + $si + "&addr=" + $si + "&todomain=" + $td + "&fromuser=" + $fU + "&touser=" + $tU;
 		$var(reg) = "/\+/%2B/g";
-		rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
-		async(rest_get("http://internals.lineblocs.com/user/hostedSIPTrunkLookup?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), HOSTED_TRUNK_REGISTER);
+		rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+		async(rest_get("{{{api_url}}}/user/hostedSIPTrunkLookup?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), HOSTED_TRUNK_REGISTER);
 		exit;
 	} else {
 		$var(query) = "domain=" + $fd + "&ip=" + $si + "&addr=" + $si;
 		$var(reg) = "/\+/%2B/g";
 		xlog("REG calling API..");
-		rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
-		async(rest_get("http://internals.lineblocs.com/user/ipWhitelistLookup?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), REGISTER);
+		rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+		async(rest_get("{{{api_url}}}/user/ipWhitelistLookup?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), REGISTER);
 		exit;
 	}
 }
@@ -771,8 +773,8 @@ route[INCOMING_VALIDATION] {
 		$var(reg) = "/\+/%2B/g";
 
 		rest_append_hf("X-Lineblocs-Carrier-Auth: YMgGtcHS56NGp95_d6o6iQ");
-		rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
-		async(rest_get("http://internals.lineblocs.com/user/incomingTrunkValidation?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), TRUNK_VALIDATION);
+		rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+		async(rest_get("{{{api_url}}}/user/incomingTrunkValidation?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), TRUNK_VALIDATION);
 		exit;
 	}
 
@@ -781,26 +783,26 @@ route[INCOMING_VALIDATION] {
         case "user_sip_trunk":
 			append_hf("X-LineBlocs-Fulfill-Type: user_sip_trunk\r\n");
 			rest_append_hf("X-Lineblocs-Carrier-Auth: YMgGtcHS56NGp95_d6o6iQ");
-			rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
+			rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
 			$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
 			$var(reg) = "/\+/%2B/g";
-			async(rest_get("http://internals.lineblocs.com/user/processSIPTrunkCall?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), USER_SIP_TRUNK);
+			async(rest_get("{{{api_url}}}/user/processSIPTrunkCall?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), USER_SIP_TRUNK);
         break;
         case "network_managed":
 			append_hf("X-LineBlocs-Fulfill-Type: network_managed\r\n");
 			rest_append_hf("X-Lineblocs-Carrier-Auth: YMgGtcHS56NGp95_d6o6iQ");
-			rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
+			rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
 			$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
 			$var(reg) = "/\+/%2B/g";
-			async(rest_get("http://internals.lineblocs.com/user/getDIDAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), DID_ASSIGNED);
+			async(rest_get("{{{api_url}}}/user/getDIDAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), DID_ASSIGNED);
         break;
         case "byo_carrier":
 			append_hf("X-LineBlocs-Fulfill-Type: byo_carrier\r\n");
 			rest_append_hf("X-Lineblocs-Carrier-Auth: YMgGtcHS56NGp95_d6o6iQ");
-			rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
+			rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
 			$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
 			$var(reg) = "/\+/%2B/g";
-			async(rest_get("http://internals.lineblocs.com/user/getDIDAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), DID_ASSIGNED);
+			async(rest_get("{{{api_url}}}/user/getDIDAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), DID_ASSIGNED);
         break;
 	}
 }
@@ -815,10 +817,10 @@ route[TRUNK_VALIDATION] {
 
 	append_hf("X-LineBlocs-Fulfill-Type: user_sip_trunk\r\n");
 	rest_append_hf("X-Lineblocs-Carrier-Auth: YMgGtcHS56NGp95_d6o6iQ");
-	rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
+	rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
 	$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
 	$var(reg) = "/\+/%2B/g";
-	async(rest_get("http://internals.lineblocs.com/user/getTrunkAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), TRUNK_ASSIGNED);
+	async(rest_get("{{{api_url}}}/user/getTrunkAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), TRUNK_ASSIGNED);
 }
 
 
@@ -830,11 +832,11 @@ route[USER_SIP_TRUNK] {
 	}
 
 	rest_append_hf("X-Lineblocs-Carrier-Auth: YMgGtcHS56NGp95_d6o6iQ");
-	rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
+	rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
 	append_hf("X-Lineblocs-User-SIP-Trunk-Addr: $var(body)\r\n");
 	$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
 	$var(reg) = "/\+/%2B/g";
-	async(rest_get("http://internals.lineblocs.com/user/getDIDAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), DID_ASSIGNED);
+	async(rest_get("{{{api_url}}}/user/getDIDAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), DID_ASSIGNED);
 }
 
 route[INCOMING_VALIDATION_2] {
@@ -845,10 +847,10 @@ route[INCOMING_VALIDATION_2] {
 	}
 
 	rest_append_hf("X-Lineblocs-Carrier-Auth: YMgGtcHS56NGp95_d6o6iQ");
-	rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
+	rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
 	$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
 	$var(reg) = "/\+/%2B/g";
-	async(rest_get("http://internals.lineblocs.com/user/getDIDAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), DID_ASSIGNED);
+	async(rest_get("{{{api_url}}}/user/getDIDAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), DID_ASSIGNED);
 }
 
 route[DID_ASSIGNED] {
@@ -860,10 +862,10 @@ route[DID_ASSIGNED] {
 
 	$ru = "sip:" + $rU + "@" + $var(body);
 	rest_append_hf("X-Lineblocs-Carrier-Auth: YMgGtcHS56NGp95_d6o6iQ");
-	rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
+	rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
 	$var(query) = "did=" + $tU + "&addr=" + $si;
 	$var(reg) = "/\+/%2B/g";
-	async(rest_get("http://internals.lineblocs.com/user/getDIDAcceptOption?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), CALL_ACTION);
+	async(rest_get("{{{api_url}}}/user/getDIDAcceptOption?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), CALL_ACTION);
 }
 
 route[TRUNK_ASSIGNED] {
@@ -875,8 +877,8 @@ route[TRUNK_ASSIGNED] {
 
 	$ru = "sip:" + $rU + "@" + $var(body);
 	#rest_append_hf("X-Lineblocs-Carrier-Auth: YMgGtcHS56NGp95_d6o6iQ");
-	rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
-	append_hf("X-LineBlocs-Key: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2\r\n");
+	rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+	append_hf("X-LineBlocs-Key: {{{lineblocs_key}}}\r\n");
 	append_hf("X-LineBlocs-Accept-Call-Type: voice\r\n");
 	append_hf("X-LineBlocs-Direction: outgoing-proxy-trunk\r\n");
 	append_hf("X-Lineblocs-Trunk-SourceIP: $fd\r\n");
@@ -890,15 +892,15 @@ route[CALL_ACTION] {
 		exit;
 	}
 
-	append_hf("X-LineBlocs-Key: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2\r\n");
+	append_hf("X-LineBlocs-Key: {{{lineblocs_key}}}\r\n");
 	switch($var(body))
 	{
 		case "accept-call":
 			log("accept-call action is set..");
 			append_hf("X-LineBlocs-Accept-Call-Type: voice\r\n");
 			append_hf("X-LineBlocs-Direction: incoming-proxy\r\n");
-			rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
-			async(rest_get("http://internals.lineblocs.com/getBestRTPProxy", $var(body), $var(ct), $var(rcode)), RTPPROXY_SELECTION);
+			rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+			async(rest_get("{{{api_url}}}/getBestRTPProxy", $var(body), $var(ct), $var(rcode)), RTPPROXY_SELECTION);
 			#route(RELAY);
 		break;
 		case "accept-fax":
@@ -970,8 +972,8 @@ route[REGISTER] {
 
 	$var(body) = "domain=" + $fd + "&ip=" + $si" + "&user=" + $fU + "&contact=" + $hdr(Contact) + "&expires=" + $hdr(Expires) + "&addr=" + $si;
 	$var(reg) = "/\+/%2B/g";
-	rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
-	async(rest_post("http://internals.lineblocs.com/user/storeRegistration", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), REGISTER_STORE);
+	rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+	async(rest_post("{{{api_url}}}/user/storeRegistration", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), REGISTER_STORE);
 
 	exit;
 }
@@ -1065,8 +1067,8 @@ route[INCOMING_MS_VALIDATE_2_ROUTE] {
 
 	$var(body) = "callid=" + $hdr(Call-ID) + "&apiid=" + $hdr(X-LineBlocs-API-CallId) + "&source=" + $si;
 	$var(reg) = "/\+/%2B/g";
-	rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
-	async(rest_post("http://internals.lineblocs.com/call/setSIPCallID", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), MS_PSTN_START_ROUTE);
+	rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+	async(rest_post("{{{api_url}}}/call/setSIPCallID", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), MS_PSTN_START_ROUTE);
 	exit;
 }
 
@@ -1080,8 +1082,8 @@ route[MS_PSTN_START_ROUTE] {
 	$var(query) = "from=" + $fU + "&to=" + $tU + "&domain=" + $hdr(X-LineBlocs-Domain) + "&source=" + $si + "&addr=" + $si;
 	$var(reg) = "/\+/%2B/g";
 
-	rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
-	async(rest_get("http://internals.lineblocs.com/user/getPSTNProviderIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), MS_PSTN_PROCESS_ROUTE);
+	rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+	async(rest_get("{{{api_url}}}/user/getPSTNProviderIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), MS_PSTN_PROCESS_ROUTE);
 	exit;
 }
 
@@ -1102,8 +1104,8 @@ route[MS_PSTN_PROCESS_ROUTE] {
 
 	# tell API what provider is being used...
 
-	rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
-	async(rest_post("http://internals.lineblocs.com/call/setProviderByIP", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), MS_PSTN_AND_FINALIZE_ROUTING);
+	rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+	async(rest_post("{{{api_url}}}/call/setProviderByIP", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), MS_PSTN_AND_FINALIZE_ROUTING);
 	exit;
 }
 
@@ -1126,8 +1128,8 @@ route[VERIFY_CALLER_ROUTE] {
 		$var(body) = "domain=" + $fd + "&type=verify-callerid-failed" + "&addr=" + $si;
 		$var(reg) = "/\+/%2B/g";
 
-		rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
-		async(rest_post("http://internals.lineblocs.com/debugger/createLogSimple", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), VERIFY_FORBIDDEN);
+		rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+		async(rest_post("{{{api_url}}}/debugger/createLogSimple", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), VERIFY_FORBIDDEN);
 		send_reply(403, "Forbidden (scenario 5)");
 		exit;
 	}
@@ -1136,8 +1138,8 @@ route[VERIFY_CALLER_ROUTE] {
 	$var(query) = "username=" + $fu + "&domain=" + $fd + "&routerip=" +  $avp(G_PUBLIC_IP) + "&addr=" + $si;
 	$var(reg) = "/\+/%2B/g";
 
-	rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
-	async(rest_get("http://internals.lineblocs.com/user/getUserAssignedIP?username=$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), PSTN_QUERY_ROUTE);
+	rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+	async(rest_get("{{{api_url}}}/user/getUserAssignedIP?username=$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), PSTN_QUERY_ROUTE);
 }
 
 route[VERIFY_FORBIDDEN] {
@@ -1153,7 +1155,7 @@ route[PSTN_QUERY_ROUTE] {
 	$var(reqnum) = $(rU{re.subst,$var(reg)});
 	xlog("req number after URL decode: $(var(reqnum))\r\n");
 	$ru = "sip:" + $var(reqnum) + "@" + $var(body);
-	append_hf("X-LineBlocs-Key: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2\r\n");
+	append_hf("X-LineBlocs-Key: {{{lineblocs_key}}}\r\n");
 	append_hf("X-LineBlocs-Call-Type: pstn\r\n");
 	append_hf("X-LineBlocs-Direction: outgoing-proxy\r\n");
 	uac_replace_from("", "sip:$fU@$fd");
@@ -1205,7 +1207,7 @@ route[PSTN_QUERY_ROUTE] {
 
 route[MEDIASERVICE_QUERY_ROUTE] {
 	$ru = "sip:" + $rU + "@" + $var(body);
-	append_hf("X-LineBlocs-Key: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2\r\n");
+	append_hf("X-LineBlocs-Key: {{{lineblocs_key}}}\r\n");
 	append_hf("X-LineBlocs-Call-Type: media\r\n");
 	append_hf("X-LineBlocs-Direction: outgoing-proxy\r\n");
 
@@ -1252,7 +1254,7 @@ route[MEDIASERVICE_QUERY_ROUTE] {
 
 route[ENDPOINT_QUERY_ROUTE] {
 	$ru = "sip:" + $rU + "@" + $var(body);
-	append_hf("X-LineBlocs-Key: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2\r\n");
+	append_hf("X-LineBlocs-Key: {{{lineblocs_key}}}\r\n");
 	append_hf("X-LineBlocs-Call-Type: endpoint\r\n");
 	append_hf("X-LineBlocs-Direction: outgoing-proxy\r\n");
 
@@ -1362,8 +1364,8 @@ onreply_route[PSTN_HANDLE_NAT] {
 	# update SIP details
 	$var(body) = "requestto=" + $ru + "&user=" + $fU + "&domain=" + $fd + "&callid=" + $hdr(Call-ID) + "&status=" + $rs;
 	$var(reg) = "/\+/%2B/g";
-	rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
-	async(rest_post("http://internals.lineblocs.com/carrier/createSIPReport", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), SIP_REPORT);
+	rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+	async(rest_post("{{{api_url}}}/carrier/createSIPReport", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), SIP_REPORT);
 }
 
 failure_route[MISSED_CALL] {
@@ -1433,8 +1435,8 @@ failure_route[PSTN_FAILURE] {
 	$var(body) = "requestto=" + $ru + "&user=" + $fU + "&domain=" + $fd + "&callid=" + $hdr(Call-ID) + "&status=" + $rs;
 	$var(reg) = "/\+/%2B/g";
 
-	rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
-	async(rest_post("http://internals.lineblocs.com/carrier/createSIPReport", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), SIP_REPORT);
+	rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+	async(rest_post("{{{api_url}}}/carrier/createSIPReport", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), SIP_REPORT);
 }
 
 route[CAPTURE_HEP_ROUTE] {
@@ -1467,16 +1469,16 @@ route[POST_CALL_PROC_ROUTE] {
 		xlog("POST_CALL_PROC_ROUTE handling INVITE event");
 		$var(query) = "invite_ip=" + $ru;
 
-		rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
-		async(rest_get("http://internals.lineblocs.com/user/logCallInviteEvent?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), INVITE_REPORT_ROUTE);
+		rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+		async(rest_get("{{{api_url}}}/user/logCallInviteEvent?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), INVITE_REPORT_ROUTE);
 	} else if (is_method("BYE")) {
 		xlog("POST_CALL_PROC_ROUTE handling BYE event");
 
 		xlog("L_INFO", "cleaning up SIP call\n");
 		$var(body) = "callid=" + $hdr(Call-ID) + "&source=" + $si;
 		$var(reg) = "/\+/%2B/g";
-		rest_append_hf("X-Lineblocs-Api-Token: a4c7f0b18e2d639a5f1c4e7b0d296a38c5f9e2d1a7b03e4d8c6f1a9b4e7d03f2");
-		async(rest_post("http://internals.lineblocs.com/user/processCDRsAndBill", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), FINALIZE_SIP_CALL);
+		rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
+		async(rest_post("{{{api_url}}}/user/processCDRsAndBill", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), FINALIZE_SIP_CALL);
 	}
 	exit;
 }
