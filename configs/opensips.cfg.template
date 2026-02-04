@@ -248,20 +248,21 @@ loadmodule "regex.so"
 # main request routing logic
 route{
 	$avp(G_PUBLIC_IP) = "{{{public_ipv4}}}";
+	$avp(API_URL) = "{{{api_url}}}";
 	$var(WPC) = $(hdr(Via)[0]{via.transport}{s.tolower});
 
-                if ($var(WPC) == "ws" || $var(WPC) == "wss"){
-                        setflag("SRC_WS");
-			setbflag("SRC_WS");
-		        force_tcp_alias();
-		}
-		# Method 2: Check the User-Agent string (Backup for JsSIP)
-	         else if ($ua =~ "JsSIP" || $ua =~ "sip.js") {
-		        setflag("SRC_WS");
-		        setbflag("SRC_WS");
-			force_tcp_alias();
-		        xlog("L_INFO", "MATCH: WebRTC detected via User-Agent ($ua)\n");
-		    }		
+    if ($var(WPC) == "ws" || $var(WPC) == "wss"){
+        setflag("SRC_WS");
+		setbflag("SRC_WS");
+		force_tcp_alias();
+	} # Method 2: Check the User-Agent string (Backup for JsSIP)
+	else if ($ua =~ "JsSIP" || $ua =~ "sip.js") {
+	    setflag("SRC_WS");
+	    setbflag("SRC_WS");
+		force_tcp_alias();
+	    xlog("L_INFO", "MATCH: WebRTC detected via User-Agent ($ua)\n");
+	}		
+
 	# replace user agent with the branded one configured in database
 	if(remove_hf("User-Agent"))
 	{
@@ -281,13 +282,13 @@ route{
 
 	if (is_method("OPTIONS")) 
 	{
-			xlog("got options request..");
-			if (is_myself("$rd")) {
-				xlog("validated options req. sending response.");
-				seturi("sip:$rd");
-				options_reply();
-			}
-			exit;
+		xlog("got options request..");
+		if (is_myself("$rd")) {
+			xlog("validated options req. sending response.");
+			seturi("sip:$rd");
+			options_reply();
+		}
+		exit;
 	}
 
 
@@ -296,6 +297,7 @@ route{
 		sl_send_reply(483,"Too Many Hops");
 		exit;
 	}
+
 	if (has_totag()) 
 	{
 		route(WITHINDLG);
@@ -311,6 +313,7 @@ route{
 		}
 		exit;
 	}
+
 	# If R-URI contains alias (added via NAT contact fixing), restore the real destination
 	t_check_trans();
 
@@ -391,7 +394,7 @@ route{
 
 	xlog("User agent is: $hdr(User-Agent)\r\n");
 	# scenario to handle calls from either subscribers or from SIPml5 agents
-	if (is_registered("location","$fu") || $hdr(User-Agent) == "IM-client/OMA1.0 sipML5-v1.2016.03.04") 
+	if (is_registered("location","$fu"))
 	{
 		xlog("RECEIVED CALL FROM EXTENSION\r\n");
 		route(INTERNAL_EXTENSION_ROUTING);
@@ -429,10 +432,10 @@ route[WITHINDLG] {
 
     # (Do NOT run for BYE or INFO without SDP)
     if ((is_method("INVITE") || is_method("UPDATE")) && has_body("application/sdp")) {
-        # Use offer here because it is a new SDP offer inside the dialog
-#        route(RTPENGINE_OFFER);i
-	rtpengine_use_set(1);	
-	rtpengine_manage();
+    	# Use offer here because it is a new SDP offer inside the dialog
+		# route(RTPENGINE_OFFER);i
+		rtpengine_use_set(1);	
+		rtpengine_manage();
     }
 
     # BYE: relay it, then clean RTPengine.
@@ -448,13 +451,13 @@ route[WITHINDLG] {
 
         exit;
     }
+
 	$var(WPC) = $(hdr(Via)[0]{via.transport}{s.tolower});
 	$var(WPD) = $(ru{uri.param,transport});
-        if ($var(WPD) == "ws" || $var(WPD) == "wss") {
-
+    if ($var(WPD) == "ws" || $var(WPD) == "wss") {
         xlog("L_INFO", "Client is WebSocket - Fixing Contact\n");
-                force_tcp_alias();
-        }
+        force_tcp_alias();
+    }
 
     # Default: relay all other in-dialog requests
     if (!t_relay()) {
@@ -466,40 +469,40 @@ route[WITHINDLG] {
 route[RELAY] {
 
     if (is_method("INVITE")) {
-     
-	   t_on_branch("PER_BRANCH_OPS");
+		t_on_branch("PER_BRANCH_OPS");
         t_on_reply("HANDLE_NAT");
         t_on_failure("MISSED_CALL");
 
-       # record_route();
+		# record_route();
 
         # --- Source transport detection ---
         # Prefer $proto over Via parsing
-	$var(WPD) = $(ru{uri.param,transport});
-	$var(WPC) = $(hdr(Via)[0]{via.transport}{s.tolower});
+		$var(WPD) = $(ru{uri.param,transport});
+		$var(WPC) = $(hdr(Via)[0]{via.transport}{s.tolower});
 
-#	if ($socket_in(port) == 7443){
- #        $var(WPC) = "wss";
-#	}
+		#	if ($socket_in(port) == 7443){
+ 		#        $var(WPC) = "wss";
+		#	}
+
         if ($var(WPC) == "ws" || $var(WPC) == "wss") {
-	xlog("L_INFO", "Client is WebSocket - Fixing Contact\n");
+			xlog("L_INFO", "Client is WebSocket - Fixing Contact\n");
             setflag("SRC_WS");
     		setbflag("SRC_WS"); 
-		force_tcp_alias();
-	       fix_nated_contact();
+			force_tcp_alias();
+	    	fix_nated_contact();
         }
-	if ($var(WPD) == "ws" || $var(WPD) == "wss") {
-        xlog("L_INFO", "Client is WebSocket - Fixing Contact\n");
+		if ($var(WPD) == "ws" || $var(WPD) == "wss") {
+        	xlog("L_INFO", "Client is WebSocket - Fixing Contact\n");
             setflag("DST_WS");
-                setbflag("DST_WS");
-        #        force_tcp_alias();
-               fix_nated_contact();
-        }
-
-        else if (nat_uac_test("private-contact,private-sdp,private-via,diff-ip-src-via,diff-port-src-via,diff-ip-src-contact,diff-port-src-contact")) {
+            setbflag("DST_WS");
+        	#        force_tcp_alias();
+            fix_nated_contact();
+        } else if (nat_uac_test("private-contact,private-sdp,private-via,diff-ip-src-via,diff-port-src-via,diff-ip-src-contact,diff-port-src-contact")) {
             fix_nated_contact();
         }
-	$var(callee_proto) = "";
+
+		$var(callee_proto) = "";
+
         # --- Destination transport detection ---
         # After lookup(), $ru points to the selected contact.
         if (lookup("location")) {
@@ -514,18 +517,20 @@ route[RELAY] {
            #     exit;
            # }
         }
-	if ($var(callee_proto) == "") {
+
+		if ($var(callee_proto) == "") {
              if ($ru =~ "transport=ws" || $ru =~ "transport=wss") {
                  $var(callee_proto) = "ws";
              }
         }
+
         if ($var(callee_proto) == "ws" || $var(callee_proto) == "wss") {
             setflag("DST_WS");
-		setbflag("DST_WS");
+			setbflag("DST_WS");
             xlog("L_INFO", "Destination identified as WebSocket\n");
         } else {
-        #    resetflag("DST_WS");
-	#    resetbflag("DST_WS");
+        	#    resetflag("DST_WS");
+			#    resetbflag("DST_WS");
             xlog("L_INFO", "Destination identified as Standard SIP\n");
         }
 
@@ -539,6 +544,7 @@ route[RELAY] {
     if (!t_relay()) {
         sl_reply_error();
     }
+
     exit;
 }
 
@@ -562,6 +568,7 @@ route[INTERNAL_MS_ROUTING] {
 		async(rest_post("{{{api_url}}}/call/setSIPCallID", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), MS_UPDATED_CALL_ID);
 		exit;
 	}
+
 	exit;
 }
 
@@ -700,7 +707,7 @@ route[BYE_QUERY_ROUTE] {
 
 	if(is_method("CANCEL|BYE"))
 	{
-#		rtpproxy_unforce();
+		#rtpproxy_unforce();
 		rtpengine_delete();
 	}
 
@@ -709,7 +716,7 @@ route[BYE_QUERY_ROUTE] {
 		send_reply(500,"Internal Error");
 	};
 
-#	route(POST_CALL_PROC_ROUTE);
+	#route(POST_CALL_PROC_ROUTE);
 }
 
 route[INCOMING_VALIDATION] {
@@ -932,13 +939,13 @@ route[REGISTER_STORE] {
 
 	if ($var(rc) < 0) 
 	{
-#		send_reply(500, "Server Internal Error");
+		#send_reply(500, "Server Internal Error");
 		exit;
 	}
 
 	if ($var(rcode) != 204) 
 	{
-#		send_reply(403, "Forbidden (scenario 3)");
+		#send_reply(403, "Forbidden (scenario 3)");
 		exit;
 	}
 
@@ -965,9 +972,9 @@ route[HOSTED_TRUNK_REGISTER] {
 	$var(auth_code) = www_authorize("", "subscriber");
 	if ($var(auth_code) == -1 || $var(auth_code) == -2) 
 	{
-			## uncomment to enable fail2ban
-			#xlog("L_NOTICE","REG Auth error for $fU@$fd from $si cause $var(auth_code)");
-			#exit;
+		## uncomment to enable fail2ban
+		#xlog("L_NOTICE","REG Auth error for $fU@$fd from $si cause $var(auth_code)");
+		#exit;
 	}
 
 	if ( $var(auth_code) < 0 ) 
@@ -1106,7 +1113,7 @@ route[RELAY_MS_TO_PSTN] {
 		if(has_body("application/sdp"))
 		{
 			#xlog("we have sdp on this $rm");
-# 			rtpproxy_offer("froc", "{{{public_ipv4}}}");
+			#rtpproxy_offer("froc", "{{{public_ipv4}}}");
 			route(RTPENGINE_OFFER);
 		}
 	
@@ -1120,7 +1127,7 @@ route[RELAY_MS_TO_PSTN] {
 	if(is_method("CANCEL|BYE"))
 	{
 		#xlog("L_NOTICE", "route sending BYE to other end..  info from: $fu, to: $tu");
-#		rtpproxy_unforce();
+		#rtpproxy_unforce();
 		rtpengine_delete();
 	}
 
@@ -1129,7 +1136,7 @@ route[RELAY_MS_TO_PSTN] {
       		send_reply(500,"Internal Error");
 	};
 
-#	route(POST_CALL_PROC_ROUTE);
+	#route(POST_CALL_PROC_ROUTE);
 }
 
 route[VERIFY_CALLER_ROUTE] {
@@ -1204,7 +1211,7 @@ route[PSTN_QUERY_ROUTE] {
 	# removing the rtpproxy session
 	if(is_method("CANCEL|BYE"))
 	{
-#		rtpproxy_unforce();
+		#rtpproxy_unforce();
 		rtpengine_delete();
 	}
 
@@ -1213,7 +1220,7 @@ route[PSTN_QUERY_ROUTE] {
 		send_reply(500,"Internal Error");
 	};
 
-#	route(POST_CALL_PROC_ROUTE);
+	#route(POST_CALL_PROC_ROUTE);
 }
 
 route[MEDIASERVICE_QUERY_ROUTE] {
@@ -1243,7 +1250,7 @@ route[MEDIASERVICE_QUERY_ROUTE] {
 		# the rtpproxy_offer
 		if(has_body("application/sdp"))
 		{
-# 			rtpproxy_offer("froc", "{{{public_ipv4}}}");
+			#rtpproxy_offer("froc", "{{{public_ipv4}}}");
 			route(RTPENGINE_OFFER);
 		}
 	}
@@ -1251,7 +1258,7 @@ route[MEDIASERVICE_QUERY_ROUTE] {
 	# removing the rtpproxy session
 	if(is_method("CANCEL|BYE"))
 	{
-#		rtpproxy_unforce();
+		#rtpproxy_unforce();
 		rtpengine_delete();
 	}
 
@@ -1260,7 +1267,7 @@ route[MEDIASERVICE_QUERY_ROUTE] {
 		send_reply(500,"Internal Error");
 	};
 
-#	route(POST_CALL_PROC_ROUTE);
+	#route(POST_CALL_PROC_ROUTE);
 }
 
 route[ENDPOINT_QUERY_ROUTE] {
@@ -1291,7 +1298,7 @@ route[ENDPOINT_QUERY_ROUTE] {
 		# the rtpproxy_offer
 		if(has_body("application/sdp"))
 		{
-# 			rtpproxy_offer("froc", "{{{public_ipv4}}}");
+			#rtpproxy_offer("froc", "{{{public_ipv4}}}");
 			route(RTPENGINE_OFFER);
 		}
 	}
@@ -1299,7 +1306,7 @@ route[ENDPOINT_QUERY_ROUTE] {
 	# removing the rtpproxy session
 	if(is_method("CANCEL|BYE"))
 	{
-#		rtpproxy_unforce();
+		#rtpproxy_unforce();
 		rtpengine_delete();
 	}
 
@@ -1309,7 +1316,7 @@ route[ENDPOINT_QUERY_ROUTE] {
 	};
 
 
-#	route(POST_CALL_PROC_ROUTE);
+	#route(POST_CALL_PROC_ROUTE);
 }
 
 branch_route[PER_BRANCH_OPS] {
@@ -1324,12 +1331,12 @@ onreply_route[HANDLE_NAT] {
 	# on our body, if we have, we answer that
 	if(has_body("application/sdp"))
 	{
-	#	rtpproxy_answer("froc", "{{{public_ipv4}}}");
+		# rtpproxy_answer("froc", "{{{public_ipv4}}}");
 		# offering rtpproxy on a non ack message
-# 	#	rtpproxy_offer("froc", "{{{public_ipv4}}}");	
+		# rtpproxy_offer("froc", "{{{public_ipv4}}}");	
 		if (t_check_status("18[0-3]|2[0-9][0-9]")){
-		route(RTPENGINE_ANSWER);
-#		rtpengine_manage();
+			route(RTPENGINE_ANSWER);
+			#rtpengine_manage();
 		}
 	}
 
@@ -1348,26 +1355,26 @@ onreply_route[PSTN_HANDLE_NAT] {
 	# we receive a reply, we need to check about application/sdp 
 	# on our body, if we have, we answer that
 
-#	if(is_method("ACK") && has_body("application/sdp"))
+	# if(is_method("ACK") && has_body("application/sdp"))
 
 	if ($ct =~ "invalid" || $ct =~ "transport=ws") {
-#       if(nat_uac_test("private-contact,private-sdp,private-via,diff-ip-src-via,diff-port-src-via,diff-ip-src-contact,diff-port-src-contact"))
-#       {
+	# if(nat_uac_test("private-contact,private-sdp,private-via,diff-ip-src-via,diff-port-src-via,diff-ip-src-contact,diff-port-src-contact"))
+	#  {
                 fix_nated_contact();
         }
 
 	
 	if (has_body("application/sdp") && nat_uac_test("private-sdp"))
 	{
-	fix_nated_sdp("rewrite-origin-ip");
+		fix_nated_sdp("rewrite-origin-ip");
 	}
 
 	if(is_method("ACK") && has_body("application/sdp")){
-	#	rtpproxy_answer("froc", "{{{public_ipv4}}}");
+		# rtpproxy_answer("froc", "{{{public_ipv4}}}");
 		route(RTPENGINE_ANSWER);
 	} else if(has_body("application/sdp")) {
 		# offering rtpproxy on a non ack message
-# 		#rtpproxy_offer("froc", "{{{public_ipv4}}}");	
+		# rtpproxy_offer("froc", "{{{public_ipv4}}}");	
 		route(RTPENGINE_OFFER);
 	}
 	# here we try to identify if the user is behind a nat again
@@ -1433,7 +1440,7 @@ route[RELAY_TO_USER_TRUNK] {
  		send_reply(500,"Internal Error");
 	};
 
-#	route(POST_CALL_PROC_ROUTE);
+	#route(POST_CALL_PROC_ROUTE);
 }
 
 failure_route[PSTN_FAILURE] {
@@ -1476,6 +1483,7 @@ route[CAPTURE_HEP_ROUTE] {
 route[POST_CALL_PROC_ROUTE] {
 	xlog("POST_CALL_PROC_ROUTE was triggered");
 	rtpengine_use_set(1);	
+	
 	if(is_method("INVITE")) {
 		xlog("POST_CALL_PROC_ROUTE handling INVITE event");
 		$var(query) = "invite_ip=" + $ru;
