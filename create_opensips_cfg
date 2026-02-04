@@ -22,6 +22,21 @@ def create_proto_support_code( public_ipv4, proto, proto_port, proto_autoscaling
  
 """
 
+def create_proto_support_code_v2( public_ipv4, proto, proto_port, proto_autoscaling=False ):
+    profile = f"PROFILE_{proto.upper()}"
+    workers = f"{proto.upper()}_workers="
+    autoscaling_code = ""
+    if proto_autoscaling:
+        autoscaling_code = f"""auto_scaling_profile = {profile}
+    scale up to 6 on 70% for 4 cycles within 5   
+    scale down to 2 on 18% for 10 cycles"""
+    socket_listening_code = f"socket={proto}:0.0.0.0:{proto_port}"
+
+    full_proto_code = f"""{autoscaling_code}
+{socket_listening_code}"""
+
+    return full_proto_code
+
 def connect_to_db():
     host = os.getenv("DB_HOST")
     user = os.getenv("DB_USER")
@@ -129,17 +144,17 @@ with open(cfg_path_new, "w") as file:
 
 
     if data['udp_support']:
-        udp_code = create_proto_support_code( public_ipv4, 'udp', udp_port, udp_autoscaling )
+        udp_code = create_proto_support_code_v2( public_ipv4, 'udp', udp_port, udp_autoscaling )
         replacements['udp_support'] = udp_code
         replacements['udp_load_module'] = f"""loadmodule "proto_udp.so"
 modparam("proto_udp", "udp_port", {udp_port})"""
     if data['tcp_support']:
-        tcp_code = create_proto_support_code( public_ipv4, 'tcp', tcp_port, tcp_autoscaling )
+        tcp_code = create_proto_support_code_v2( public_ipv4, 'tcp', tcp_port, tcp_autoscaling )
         replacements['tcp_support'] = tcp_code
         replacements['tcp_load_module'] = f"""loadmodule "proto_tcp.so"
 modparam("proto_tcp", "tcp_port", {tcp_port})"""
     if data['ws_support']:
-        ws_code = create_proto_support_code( public_ipv4, 'ws', ws_port)
+        ws_code = create_proto_support_code_v2( public_ipv4, 'ws', ws_port)
         replacements['ws_support'] = ws_code
         replacements['ws_load_module'] = f"""loadmodule "proto_ws.so"
 """

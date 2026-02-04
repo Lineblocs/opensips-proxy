@@ -16,12 +16,14 @@ stderror_enabled=yes
 syslog_facility=LOG_LOCAL0
 
 auto_scaling_cycle=3  # do auto-scaling checks once every 3 seconds
-auto_scaling_profile = PROFILE_UDP
-     scale up to 6 on 70% for 4 cycles within 5   
-     scale down to 2 on 18% for 10 cycles
-auto_scaling_profile = PROFILE_TCP
-     scale up to 6 on 70% for 4 cycles within 5   
-     scale down to 2 on 18% for 10 cycles
+{{{udp_support}}}
+{{{tcp_support}}}
+#auto_scaling_profile = PROFILE_UDP
+#     scale up to 6 on 70% for 4 cycles within 5   
+#     scale down to 2 on 18% for 10 cycles
+#auto_scaling_profile = PROFILE_TCP
+#     scale up to 6 on 70% for 4 cycles within 5   
+#     scale down to 2 on 18% for 10 cycles
 auto_scaling_profile = PROFILE_TIMER
      scale up to 6 on 70% for 4 cycles within 5   
      scale down to 2 on 18% for 10 cycles
@@ -55,9 +57,9 @@ socket=wss:0.0.0.0:7443
 
 socket=hep_udp:127.0.0.1:9060
 
-#socket=udp:3.97.186.67:5060   # CUSTOMIZE ME
-alias=udp:3.97.186.67:5060
-advertised_address="3.97.186.67"
+#socket=udp:{{{public_ipv4}}}:5060   # CUSTOMIZE ME
+alias=udp:{{{public_ipv4}}}:5060
+advertised_address="{{{public_ipv4}}}"
 
 
 
@@ -77,21 +79,21 @@ modparam("proto_wss", "wss_port", 7443)
 
 loadmodule "tls_openssl.so"
 loadmodule "tls_mgm.so"
-modparam("tls_mgm", "client_domain", "dynamocloud.lineblocs.com")
-modparam("tls_mgm", "verify_cert", "[dynamocloud.lineblocs.com]0")
-modparam("tls_mgm", "require_cert", "[dynamocloud.lineblocs.com]0")
-modparam("tls_mgm", "tls_method", "[dynamocloud.lineblocs.com]TLSv1_2")
-modparam("tls_mgm", "certificate", "[dynamocloud.lineblocs.com]/etc/opensips/tls/fullchain1.pem")
-modparam("tls_mgm", "private_key", "[dynamocloud.lineblocs.com]/etc/opensips/tls/privkey1.pem")
-modparam("tls_mgm", "ca_list", "[dynamocloud.lineblocs.com]/etc/ssl/certs/ca-certificates.crt")
+modparam("tls_mgm", "client_domain", "{{{deployment_domain}}}")
+modparam("tls_mgm", "verify_cert", "[{{{deployment_domain}}}]0")
+modparam("tls_mgm", "require_cert", "[{{{deployment_domain}}}]0")
+modparam("tls_mgm", "tls_method", "[{{{deployment_domain}}}]TLSv1_2")
+modparam("tls_mgm", "certificate", "[{{{deployment_domain}}}]/etc/opensips/tls/fullchain1.pem")
+modparam("tls_mgm", "private_key", "[{{{deployment_domain}}}]/etc/opensips/tls/privkey1.pem")
+modparam("tls_mgm", "ca_list", "[{{{deployment_domain}}}]/etc/ssl/certs/ca-certificates.crt")
 
-modparam("tls_mgm", "server_domain", "dynamocloud.lineblocs.com")
-modparam("tls_mgm", "verify_cert", "[dynamocloud.lineblocs.com]0")
-modparam("tls_mgm", "require_cert", "[dynamocloud.lineblocs.com]0")
-modparam("tls_mgm", "tls_method", "[dynamocloud.lineblocs.com]TLSv1_2")
-modparam("tls_mgm", "certificate", "[dynamocloud.lineblocs.com]/etc/opensips/tls/fullchain1.pem")
-modparam("tls_mgm", "private_key", "[dynamocloud.lineblocs.com]/etc/opensips/tls/privkey1.pem")
-modparam("tls_mgm", "ca_list", "[dynamocloud.lineblocs.com]/etc/ssl/certs/ca-certificates.crt")
+modparam("tls_mgm", "server_domain", "{{{deployment_domain}}}")
+modparam("tls_mgm", "verify_cert", "[{{{deployment_domain}}}]0")
+modparam("tls_mgm", "require_cert", "[{{{deployment_domain}}}]0")
+modparam("tls_mgm", "tls_method", "[{{{deployment_domain}}}]TLSv1_2")
+modparam("tls_mgm", "certificate", "[{{{deployment_domain}}}]/etc/opensips/tls/fullchain1.pem")
+modparam("tls_mgm", "private_key", "[{{{deployment_domain}}}]/etc/opensips/tls/privkey1.pem")
+modparam("tls_mgm", "ca_list", "[{{{deployment_domain}}}]/etc/ssl/certs/ca-certificates.crt")
 
 
 
@@ -164,11 +166,11 @@ loadmodule "nathelper.so"
 modparam("nathelper", "ping_nated_only", 1) # Ping only clients behind NAT
 modparam("nathelper", "sipping_bflag", "8")
 modparam("nathelper", "received_avp", "$avp(received)")
-modparam("nathelper", "force_socket", "udp:3.97.186.67:7722")
+modparam("nathelper", "force_socket", "udp:{{{public_ipv4}}}:7722")
 
 #loadmodule "rtpproxy.so"
 # RTPProxy setup
-#modparam("rtpproxy", "rtpproxy_sock", "udp:3.97.186.67:7722")
+#modparam("rtpproxy", "rtpproxy_sock", "udp:{{{public_ipv4}}}:7722")
 #modparam("rtpproxy", "db_url", "mysql://lineblocs:E0N798KU5TEh@172.31.15.129/opensips")
 #modparam("rtpproxy", "db_table", "rtpproxy_sockets")
 #modparam("rtpproxy", "rtpp_socket_col", "rtpproxy_sock")
@@ -245,7 +247,7 @@ loadmodule "regex.so"
 
 # main request routing logic
 route{
-	$avp(G_PUBLIC_IP) = "3.97.186.67";
+	$avp(G_PUBLIC_IP) = "{{{public_ipv4}}}";
 	$var(WPC) = $(hdr(Via)[0]{via.transport}{s.tolower});
 
                 if ($var(WPC) == "ws" || $var(WPC) == "wss"){
@@ -663,7 +665,7 @@ route[PSTN_ROUTING] {
 		$var(query) = "did=" + $tU + "&number=" + $fU + "&source=" + $si + "&routerip=" +  $avp(G_PUBLIC_IP) + "&addr=" + $si;
 		$var(reg) = "/\+/%2B/g";
 
-		rest_append_hf("X-Lineblocs-Carrier-Auth: YMgGtcHS56NGp95_d6o6iQ");
+		rest_append_hf("X-Lineblocs-Carrier-Auth: {{{carrier_key}}}");
 		rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
 		async(rest_get("{{{api_url}}}/user/incomingDIDValidation?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), INCOMING_VALIDATION);
 		exit;
@@ -690,61 +692,7 @@ route[SIP_DEVICE_REGISTRATION] {
 	}
 }
 
-route[RELAY_MS_TO_PSTN] {
 
-	# check if this request is a invite
-	append_hf("X-LineBlocs-Parent-Call-ID: $hdr(Call-ID)\r\n");
-	if (is_method("INVITE")) 
-	{
-		# for each branch we will call the function below
-		
-		t_on_branch("PER_BRANCH_OPS");
-
-		# for each reply we will call the function below
-		
-		t_on_reply("PSTN_HANDLE_NAT");
-
-		# if the call was not completed, so failure route
-		t_on_failure("PSTN_FAILURE");
-
-
-		if(nat_uac_test("private-contact,private-sdp,private-via,diff-ip-src-via,diff-port-src-via,diff-ip-src-contact,diff-port-src-contact"))
-		{
-			# user identified as behing a nat
-			#xlog("we are on route relay, user behind nat");
-			fix_nated_contact();
-		}
-
-		# if we have an application/sdp on our body, so we execute
-        # the rtpproxy_offer
-		if(has_body("application/sdp"))
-		{
-			#xlog("we have sdp on this $rm");
-# 			rtpproxy_offer("froc", "3.97.186.67");
-			route(RTPENGINE_OFFER);
-		}
-	
-		if (lookup("location")) 
-		{
-			#xlog("request uri is now $ru");
-		}
-	}
-
-	# removing the rtpproxy session
-	if(is_method("CANCEL|BYE"))
-	{
-		#xlog("L_NOTICE", "route sending BYE to other end..  info from: $fu, to: $tu");
-#		rtpproxy_unforce();
-		rtpengine_delete();
-	}
-
-	if (!t_relay()) 
-	{
-      		send_reply(500,"Internal Error");
-	};
-
-#	route(POST_CALL_PROC_ROUTE);
-}
 
 route[BYE_QUERY_ROUTE] {
     $ru = "sip:" + $rU + "@" + $avp(value);
@@ -772,7 +720,7 @@ route[INCOMING_VALIDATION] {
 		$var(query) = "did=" + $tU + "&number=" + $fU + "&source=" + $si + "&routerip=" +  $avp(G_PUBLIC_IP) + "&addr=" + $si + "&fromdomain=" + $fd;
 		$var(reg) = "/\+/%2B/g";
 
-		rest_append_hf("X-Lineblocs-Carrier-Auth: YMgGtcHS56NGp95_d6o6iQ");
+		rest_append_hf("X-Lineblocs-Carrier-Auth: {{{carrier_key}}}");
 		rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
 		async(rest_get("{{{api_url}}}/user/incomingTrunkValidation?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), TRUNK_VALIDATION);
 		exit;
@@ -782,7 +730,7 @@ route[INCOMING_VALIDATION] {
 	{
         case "user_sip_trunk":
 			append_hf("X-LineBlocs-Fulfill-Type: user_sip_trunk\r\n");
-			rest_append_hf("X-Lineblocs-Carrier-Auth: YMgGtcHS56NGp95_d6o6iQ");
+			rest_append_hf("X-Lineblocs-Carrier-Auth: {{{carrier_key}}}");
 			rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
 			$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
 			$var(reg) = "/\+/%2B/g";
@@ -790,7 +738,7 @@ route[INCOMING_VALIDATION] {
         break;
         case "network_managed":
 			append_hf("X-LineBlocs-Fulfill-Type: network_managed\r\n");
-			rest_append_hf("X-Lineblocs-Carrier-Auth: YMgGtcHS56NGp95_d6o6iQ");
+			rest_append_hf("X-Lineblocs-Carrier-Auth: {{{carrier_key}}}");
 			rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
 			$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
 			$var(reg) = "/\+/%2B/g";
@@ -798,7 +746,7 @@ route[INCOMING_VALIDATION] {
         break;
         case "byo_carrier":
 			append_hf("X-LineBlocs-Fulfill-Type: byo_carrier\r\n");
-			rest_append_hf("X-Lineblocs-Carrier-Auth: YMgGtcHS56NGp95_d6o6iQ");
+			rest_append_hf("X-Lineblocs-Carrier-Auth: {{{carrier_key}}}");
 			rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
 			$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
 			$var(reg) = "/\+/%2B/g";
@@ -816,7 +764,7 @@ route[TRUNK_VALIDATION] {
 	}
 
 	append_hf("X-LineBlocs-Fulfill-Type: user_sip_trunk\r\n");
-	rest_append_hf("X-Lineblocs-Carrier-Auth: YMgGtcHS56NGp95_d6o6iQ");
+	rest_append_hf("X-Lineblocs-Carrier-Auth: {{{carrier_key}}}");
 	rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
 	$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
 	$var(reg) = "/\+/%2B/g";
@@ -831,7 +779,7 @@ route[USER_SIP_TRUNK] {
 		exit;
 	}
 
-	rest_append_hf("X-Lineblocs-Carrier-Auth: YMgGtcHS56NGp95_d6o6iQ");
+	rest_append_hf("X-Lineblocs-Carrier-Auth: {{{carrier_key}}}");
 	rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
 	append_hf("X-Lineblocs-User-SIP-Trunk-Addr: $var(body)\r\n");
 	$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
@@ -846,7 +794,7 @@ route[INCOMING_VALIDATION_2] {
 		exit;
 	}
 
-	rest_append_hf("X-Lineblocs-Carrier-Auth: YMgGtcHS56NGp95_d6o6iQ");
+	rest_append_hf("X-Lineblocs-Carrier-Auth: {{{carrier_key}}}");
 	rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
 	$var(query) = "did=" + $tU + "&from=" + $fU + "&source=" + $si + "&addr=" + $si;
 	$var(reg) = "/\+/%2B/g";
@@ -861,7 +809,7 @@ route[DID_ASSIGNED] {
 	}
 
 	$ru = "sip:" + $rU + "@" + $var(body);
-	rest_append_hf("X-Lineblocs-Carrier-Auth: YMgGtcHS56NGp95_d6o6iQ");
+	rest_append_hf("X-Lineblocs-Carrier-Auth: {{{carrier_key}}}");
 	rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
 	$var(query) = "did=" + $tU + "&addr=" + $si;
 	$var(reg) = "/\+/%2B/g";
@@ -876,7 +824,7 @@ route[TRUNK_ASSIGNED] {
 	}
 
 	$ru = "sip:" + $rU + "@" + $var(body);
-	#rest_append_hf("X-Lineblocs-Carrier-Auth: YMgGtcHS56NGp95_d6o6iQ");
+	#rest_append_hf("X-Lineblocs-Carrier-Auth: {{{carrier_key}}}");
 	rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
 	append_hf("X-LineBlocs-Key: {{{lineblocs_key}}}\r\n");
 	append_hf("X-LineBlocs-Accept-Call-Type: voice\r\n");
@@ -1097,8 +1045,11 @@ route[MS_PSTN_PROCESS_ROUTE] {
 
 	# initiate routing data...
 	$avp(body) = $(var(body));
+
+	xlog("received JSON data: $(var(body))\r\n");
 	$json(object) := $(avp(body));
 	$ru = "sip:" + $(json(object/did)) + "@" + $(json(object/ip_addr));
+	$avp(pstn_ru_addr) = $ru;
 	$var(body) = "ip="  + $(json(object/ip_addr)) +  "&apiid=" + $hdr(X-LineBlocs-API-CallId);
 	$var(reg) = "/\+/%2B/g";
 
@@ -1110,6 +1061,8 @@ route[MS_PSTN_PROCESS_ROUTE] {
 }
 
 route[MS_PSTN_AND_FINALIZE_ROUTING] {
+	xlog("AVP data from route: $avp(pstn_ru_addr)\r\n");
+
 	if ($var(rcode) != 200) 
 	{
 		send_reply(500, "Media server Routing Failed (scenario 3)");
@@ -1119,6 +1072,64 @@ route[MS_PSTN_AND_FINALIZE_ROUTING] {
 	# start routing
 	route(RELAY_MS_TO_PSTN);
 	exit;
+}
+
+route[RELAY_MS_TO_PSTN] {
+
+	$ru = $avp(pstn_ru_addr);
+	xlog("L_INFO", "Relaying call to carrier at IP: $ru\n");
+	# check if this request is a invite
+	append_hf("X-LineBlocs-Parent-Call-ID: $hdr(Call-ID)\r\n");
+	if (is_method("INVITE")) 
+	{
+		# for each branch we will call the function below
+		
+		t_on_branch("PER_BRANCH_OPS");
+
+		# for each reply we will call the function below
+		
+		t_on_reply("PSTN_HANDLE_NAT");
+
+		# if the call was not completed, so failure route
+		t_on_failure("PSTN_FAILURE");
+
+
+		if(nat_uac_test("private-contact,private-sdp,private-via,diff-ip-src-via,diff-port-src-via,diff-ip-src-contact,diff-port-src-contact"))
+		{
+			# user identified as behing a nat
+			#xlog("we are on route relay, user behind nat");
+			fix_nated_contact();
+		}
+
+		# if we have an application/sdp on our body, so we execute
+        # the rtpproxy_offer
+		if(has_body("application/sdp"))
+		{
+			#xlog("we have sdp on this $rm");
+# 			rtpproxy_offer("froc", "{{{public_ipv4}}}");
+			route(RTPENGINE_OFFER);
+		}
+	
+		if (lookup("location")) 
+		{
+			#xlog("request uri is now $ru");
+		}
+	}
+
+	# removing the rtpproxy session
+	if(is_method("CANCEL|BYE"))
+	{
+		#xlog("L_NOTICE", "route sending BYE to other end..  info from: $fu, to: $tu");
+#		rtpproxy_unforce();
+		rtpengine_delete();
+	}
+
+	if (!t_relay()) 
+	{
+      		send_reply(500,"Internal Error");
+	};
+
+#	route(POST_CALL_PROC_ROUTE);
 }
 
 route[VERIFY_CALLER_ROUTE] {
@@ -1184,7 +1195,7 @@ route[PSTN_QUERY_ROUTE] {
 		if(has_body("application/sdp"))
 		{
 			#xlog("we have sdp on this $rm");
-# 			rtpproxy_offer("froc", "3.97.186.67");
+# 			rtpproxy_offer("froc", "{{{public_ipv4}}}");
 			route(RTPENGINE_OFFER);
 		}
 	
@@ -1232,7 +1243,7 @@ route[MEDIASERVICE_QUERY_ROUTE] {
 		# the rtpproxy_offer
 		if(has_body("application/sdp"))
 		{
-# 			rtpproxy_offer("froc", "3.97.186.67");
+# 			rtpproxy_offer("froc", "{{{public_ipv4}}}");
 			route(RTPENGINE_OFFER);
 		}
 	}
@@ -1280,7 +1291,7 @@ route[ENDPOINT_QUERY_ROUTE] {
 		# the rtpproxy_offer
 		if(has_body("application/sdp"))
 		{
-# 			rtpproxy_offer("froc", "3.97.186.67");
+# 			rtpproxy_offer("froc", "{{{public_ipv4}}}");
 			route(RTPENGINE_OFFER);
 		}
 	}
@@ -1313,9 +1324,9 @@ onreply_route[HANDLE_NAT] {
 	# on our body, if we have, we answer that
 	if(has_body("application/sdp"))
 	{
-	#	rtpproxy_answer("froc", "3.97.186.67");
+	#	rtpproxy_answer("froc", "{{{public_ipv4}}}");
 		# offering rtpproxy on a non ack message
-# 	#	rtpproxy_offer("froc", "3.97.186.67");	
+# 	#	rtpproxy_offer("froc", "{{{public_ipv4}}}");	
 		if (t_check_status("18[0-3]|2[0-9][0-9]")){
 		route(RTPENGINE_ANSWER);
 #		rtpengine_manage();
@@ -1352,11 +1363,11 @@ onreply_route[PSTN_HANDLE_NAT] {
 	}
 
 	if(is_method("ACK") && has_body("application/sdp")){
-	#	rtpproxy_answer("froc", "3.97.186.67");
+	#	rtpproxy_answer("froc", "{{{public_ipv4}}}");
 		route(RTPENGINE_ANSWER);
 	} else if(has_body("application/sdp")) {
 		# offering rtpproxy on a non ack message
-# 		#rtpproxy_offer("froc", "3.97.186.67");	
+# 		#rtpproxy_offer("froc", "{{{public_ipv4}}}");	
 		route(RTPENGINE_OFFER);
 	}
 	# here we try to identify if the user is behind a nat again
@@ -1406,7 +1417,7 @@ route[RELAY_TO_USER_TRUNK] {
 		if(has_body("application/sdp"))
 		{
 			#xlog("we have sdp on this $rm");
-# 			rtpproxy_offer("froc", "3.97.186.67");
+# 			rtpproxy_offer("froc", "{{{public_ipv4}}}");
 			route(RTPENGINE_OFFER);
 		}
 	}
