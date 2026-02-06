@@ -8,22 +8,20 @@
 ####### Global Parameters #########
 
 /* uncomment the following lines to enable debugging */
-debug_mode=no
+debug_mode=yes
 
-log_level=3
+log_level=4
 xlog_level=4
-stderror_enabled=yes
-syslog_facility=LOG_LOCAL0
+log_stderror=no
+log_facility=LOG_LOCAL0
 
 auto_scaling_cycle=3  # do auto-scaling checks once every 3 seconds
-{{{udp_support}}}
-{{{tcp_support}}}
-#auto_scaling_profile = PROFILE_UDP
-#     scale up to 6 on 70% for 4 cycles within 5   
-#     scale down to 2 on 18% for 10 cycles
-#auto_scaling_profile = PROFILE_TCP
-#     scale up to 6 on 70% for 4 cycles within 5   
-#     scale down to 2 on 18% for 10 cycles
+auto_scaling_profile = PROFILE_UDP
+     scale up to 6 on 70% for 4 cycles within 5   
+     scale down to 2 on 18% for 10 cycles
+auto_scaling_profile = PROFILE_TCP
+     scale up to 6 on 70% for 4 cycles within 5   
+     scale down to 2 on 18% for 10 cycles
 auto_scaling_profile = PROFILE_TIMER
      scale up to 6 on 70% for 4 cycles within 5   
      scale down to 2 on 18% for 10 cycles
@@ -38,64 +36,39 @@ auto_scaling_profile = PROFILE_TIMER
 
 
 auto_aliases=no
-tcp_accept_aliases=1
 
 timer_workers = 2 use_auto_scaling_profile PROFILE_TIMER
 
 # UDP support
-socket=udp:0.0.0.0:5060
-socket=wss:0.0.0.0:7443
-#listen=udp:0.0.0.0:5060
+#listen=udp:{{{public_ipv4}}}:5060
+{{{udp_support}}}
 
 # TCP support
 #listen=tcp:127.0.0.1:5080
-
+{{{tcp_support}}}
 
 # TLS support
 #listen=tcp:127.0.0.1:5080
+{{{tcp_support}}}
 
+listen=hep_udp:{{{public_ipv4}}}:9060
 
-socket=hep_udp:127.0.0.1:9060
-
-#socket=udp:{{{public_ipv4}}}:5060   # CUSTOMIZE ME
+#socket=udp:{{{private_ipv4}}}:5060   # CUSTOMIZE ME
 alias=udp:{{{public_ipv4}}}:5060
-advertised_address="{{{public_ipv4}}}"
+advertised_address="{{{advertized_ipv4}}}"
 
 
 
 ####### Modules Section ########
 
 #set module path
-mpath="/usr/lib/x86_64-linux-gnu/opensips/modules"
+mpath="/usr/lib/x86_64-linux-gnu/opensips/modules/"
 
 #### SIGNALING module
 loadmodule "signaling.so"
 
 #### StateLess module
 loadmodule "sl.so"
-
-loadmodule "proto_wss.so"
-modparam("proto_wss", "wss_port", 7443)
-
-loadmodule "tls_openssl.so"
-loadmodule "tls_mgm.so"
-modparam("tls_mgm", "client_domain", "{{{deployment_domain}}}")
-modparam("tls_mgm", "verify_cert", "[{{{deployment_domain}}}]0")
-modparam("tls_mgm", "require_cert", "[{{{deployment_domain}}}]0")
-modparam("tls_mgm", "tls_method", "[{{{deployment_domain}}}]TLSv1_2")
-modparam("tls_mgm", "certificate", "[{{{deployment_domain}}}]/etc/opensips/tls/fullchain1.pem")
-modparam("tls_mgm", "private_key", "[{{{deployment_domain}}}]/etc/opensips/tls/privkey1.pem")
-modparam("tls_mgm", "ca_list", "[{{{deployment_domain}}}]/etc/ssl/certs/ca-certificates.crt")
-
-modparam("tls_mgm", "server_domain", "{{{deployment_domain}}}")
-modparam("tls_mgm", "verify_cert", "[{{{deployment_domain}}}]0")
-modparam("tls_mgm", "require_cert", "[{{{deployment_domain}}}]0")
-modparam("tls_mgm", "tls_method", "[{{{deployment_domain}}}]TLSv1_2")
-modparam("tls_mgm", "certificate", "[{{{deployment_domain}}}]/etc/opensips/tls/fullchain1.pem")
-modparam("tls_mgm", "private_key", "[{{{deployment_domain}}}]/etc/opensips/tls/privkey1.pem")
-modparam("tls_mgm", "ca_list", "[{{{deployment_domain}}}]/etc/ssl/certs/ca-certificates.crt")
-
-
 
 #### Transaction Module
 loadmodule "tm.so"
@@ -112,7 +85,6 @@ loadmodule "auth_db.so"
 # ----- auth_db params -----
 modparam("auth_db", "calculate_ha1", yes)
 modparam("auth_db", "password_column", "password")
-#modparam("auth_db", "db_url","mysql://lineblocs:E0N798KU5TEh@172.31.15.129/opensips")
 modparam("auth_db", "db_url","mysql://{{{db_user}}}:{{{db_pass}}}@{{{db_host}}}/{{{db_opensips}}}")
 modparam("auth_db", "load_credentials", "")
 modparam("auth_db", "use_domain", 1)
@@ -120,7 +92,6 @@ modparam("auth_db", "use_domain", 1)
 
 loadmodule "domain.so"
 # ----- domain params -----
-#modparam("domain", "db_url", "mysql://lineblocs:E0N798KU5TEh@172.31.15.129/opensips")
 modparam("domain", "db_url", "mysql://{{{db_user}}}:{{{db_pass}}}@{{{db_host}}}/{{{db_opensips}}}")
 modparam("domain", "db_mode", 0)   # Use caching
 
@@ -137,9 +108,9 @@ loadmodule "maxfwd.so"
 loadmodule "sipmsgops.so"
 
 
-loadmodule "sqlops.so"
+loadmodule "avpops.so"
 # default URL
-modparam("sqlops","db_url","mysql://{{{db_user}}}:{{{db_pass}}}@{{{db_host}}}/{{{db_opensips}}}")
+modparam("avpops","db_url","mysql://{{{db_user}}}:{{{db_pass}}}@{{{db_host}}}/{{{db_opensips}}}")
 
 
 #### FIFO Management Interface
@@ -166,27 +137,19 @@ loadmodule "nathelper.so"
 modparam("nathelper", "ping_nated_only", 1) # Ping only clients behind NAT
 modparam("nathelper", "sipping_bflag", "8")
 modparam("nathelper", "received_avp", "$avp(received)")
-modparam("nathelper", "force_socket", "udp:{{{public_ipv4}}}:7722")
+modparam("nathelper", "force_socket", "udp:{{{private_ipv4}}}:7722")
 
-#loadmodule "rtpproxy.so"
+loadmodule "rtpproxy.so"
 # RTPProxy setup
-#modparam("rtpproxy", "rtpproxy_sock", "udp:{{{public_ipv4}}}:7722")
-#modparam("rtpproxy", "db_url", "mysql://lineblocs:E0N798KU5TEh@172.31.15.129/opensips")
-#modparam("rtpproxy", "db_table", "rtpproxy_sockets")
-#modparam("rtpproxy", "rtpp_socket_col", "rtpproxy_sock")
-#modparam("rtpproxy", "rtpproxy_disable_tout", 20)
-#modparam("rtpproxy", "rtpproxy_autobridge", 1)
-#modparam("rtpproxy", "rtpproxy_retr", 2)
-#modparam("rtpproxy", "nortpproxy_str", "a=sdpmangled:yes\r\n")
+#modparam("rtpproxy", "rtpproxy_sock", "udp:{{{rtpproxy_ipv4}}}:7722")
+modparam("rtpproxy", "db_url", "mysql://{{{db_user}}}:{{{db_pass}}}@{{{db_host}}}/{{{db_opensips}}}")
+modparam("rtpproxy", "db_table", "rtpproxy_sockets")
+modparam("rtpproxy", "rtpp_socket_col", "rtpproxy_sock")
+modparam("rtpproxy", "rtpproxy_disable_tout", 20)
+modparam("rtpproxy", "rtpproxy_autobridge", 1)
+modparam("rtpproxy", "rtpproxy_retr", 2)
+modparam("rtpproxy", "nortpproxy_str", "a=sdpmangled:yes\r\n")
 
-loadmodule "dialog.so"
-#modparam("dialog", "db_url", "mysql://lineblocs:E0N798KU5TEh@172.31.15.129/opensips")
-modparam("dialog", "db_mode", 0)
-
-### RTPengine protocol
-loadmodule "rtpengine.so"
-modparam("rtpengine", "db_url", "mysql://{{{db_user}}}:{{{db_pass}}}@{{{db_host}}}/{{{db_opensips}}}")
-#modparam("rtpengine", "rtpengine_sock", "udp:127.0.0.1:2223")
 
 loadmodule "uac.so"
 
@@ -203,18 +166,17 @@ modparam("acc", "detect_direction", 0)
 
 #### UDP protocol
 #loadmodule "proto_udp.so"
-loadmodule "proto_udp.so"
-modparam("proto_udp", "udp_port", 5060)
+{{{udp_load_module}}}
 
 ## TCP protocol
 #loadmodule "proto_tcp.so"
 #modparam("proto_tcp", "tcp_port", 5065)
-
+{{{tcp_load_module}}}
 
 ## TCP protocol
 #loadmodule "proto_tcp.so"
 #modparam("proto_tcp", "tcp_port", 5065)
-
+{{{tcp_load_module}}}
 
 
 
@@ -231,7 +193,7 @@ loadmodule "options.so"
 
 ### CHANGEME mysql uri here if you do sip_capture()
 loadmodule "sipcapture.so"
-modparam("sipcapture", "db_url", "mysql://{{{db_user}}}:{{{db_pass}}}@{{{db_host}}}/{{{db_opensips}}}")
+modparam("sipcapture", "db_url", "mysql://{{{db_user}}}:{{{db_pass}}}@{{{db_host}}}/{{{db_homer}}}")
 modparam("sipcapture", "capture_on", 0)
 modparam("sipcapture", "hep_capture_on", 0)
 modparam("sipcapture", "hep_route", "CAPTURE_HEP_ROUTE")
@@ -239,7 +201,7 @@ modparam("sipcapture", "hep_route", "CAPTURE_HEP_ROUTE")
 loadmodule "proto_hep.so"
 # use Homer5 formats
 modparam("proto_hep", "homer5_on", 1)
-user_agent_header="User-Agent: Lineblocs SIP router (powered by OpenSIPs)"
+user_agent_header="User-Agent: {{{user_agent}}}"
 
 loadmodule "regex.so"
 
@@ -247,27 +209,12 @@ loadmodule "regex.so"
 
 # main request routing logic
 route{
-	$avp(G_PUBLIC_IP) = "{{{public_ipv4}}}";
-	$avp(API_URL) = "{{{api_url}}}";
-	$var(WPC) = $(hdr(Via)[0]{via.transport}{s.tolower});
-
-    if ($var(WPC) == "ws" || $var(WPC) == "wss"){
-        setflag("SRC_WS");
-		setbflag("SRC_WS");
-		force_tcp_alias();
-	} # Method 2: Check the User-Agent string (Backup for JsSIP)
-	else if ($ua =~ "JsSIP" || $ua =~ "sip.js") {
-	    setflag("SRC_WS");
-	    setbflag("SRC_WS");
-		force_tcp_alias();
-	    xlog("L_INFO", "MATCH: WebRTC detected via User-Agent ($ua)\n");
-	}		
 
 	# replace user agent with the branded one configured in database
 	if(remove_hf("User-Agent"))
 	{
 		# User Agent header was removed
-		append_hf("User-Agent: Lineblocs SIP router (powered by OpenSIPs)\r\n"); 
+		append_hf("User-Agent: {{{user_agent}}}\r\n"); 
 	}
 
 	if ($ua=~"friendly-scanner") 
@@ -282,13 +229,13 @@ route{
 
 	if (is_method("OPTIONS")) 
 	{
-		xlog("got options request..");
-		if (is_myself("$rd")) {
-			xlog("validated options req. sending response.");
-			seturi("sip:$rd");
-			options_reply();
-		}
-		exit;
+			xlog("got options request..");
+			if (is_myself("$rd")) {
+				xlog("validated options req. sending response.");
+				seturi("sip:$rd");
+				options_reply();
+			}
+			exit;
 	}
 
 
@@ -300,9 +247,36 @@ route{
 
 	if (has_totag()) 
 	{
-		route(WITHINDLG);
-    		exit;
-	}	
+		# sequential request withing a dialog should
+        # take the path determined by record-routing
+		if (loose_route()) 
+		{
+			if (is_method("INVITE")) 
+			{
+                record_route_preset("{{{public_ipv4}}}");
+				record_route();
+			}
+
+			route(RELAY);
+		} else {
+			if (is_method("ACK")) 
+			{
+				if ( t_check_trans() ) 
+				{
+					t_relay();
+					exit;
+				} else {
+					# xlog("We are on has_totag, our method is not ACK [ $rm ] ");
+					# ACK without matching transaction ->
+                    # ignore and discard
+					exit;
+				}
+			}
+			
+			sl_send_reply(404,"Not here");
+		}
+		exit;
+	}
 
 	# Cancel processing
 	if (is_method("CANCEL"))
@@ -314,7 +288,6 @@ route{
 		exit;
 	}
 
-	# If R-URI contains alias (added via NAT contact fixing), restore the real destination
 	t_check_trans();
 
 	if ( !(is_method("REGISTER")  ) ) 
@@ -327,7 +300,7 @@ route{
 			if (!is_myself("$rd")) 
 			{
 				xlog("REG sending back 403. we don't know this domain..");
-				send_reply(403,"Relay forbidden");
+				send_reply(403,"Rely forbidden");
 				exit;
 			}
 		}
@@ -369,10 +342,7 @@ route{
 
 	if (is_method("REGISTER"))
 	{
-
 		xlog("received REGISTER from SIP device\r\n");
-		force_rport();
-		fix_nated_register();
 		route(SIP_DEVICE_REGISTRATION);
 		exit;
 	}
@@ -394,7 +364,7 @@ route{
 
 	xlog("User agent is: $hdr(User-Agent)\r\n");
 	# scenario to handle calls from either subscribers or from SIPml5 agents
-	if (is_registered("location","$fu"))
+	if (is_registered("location","$fu") || $hdr(User-Agent) == "IM-client/OMA1.0 sipML5-v1.2016.03.04") 
 	{
 		xlog("RECEIVED CALL FROM EXTENSION\r\n");
 		route(INTERNAL_EXTENSION_ROUTING);
@@ -412,142 +382,60 @@ route{
 	route(RELAY);
 }
 
-route[WITHINDLG] {
-    # Handle in-dialog requests (ACK/BYE/reINVITE/UPDATE/INFO/OPTIONS/etc.)
-    # Must be called only when has_totag() is true.
-
-    # ACK is special: it may be hop-by-hop and is not always a transaction in the same way.
-	# 1) Follow the Route set (Record-Route path)
-    if (!loose_route()) {
-        if (is_method("ACK")) {
-            # ACK for a local negative reply (no Route set / no dialog path)
-            exit;
-        }
-        sl_send_reply(404, "Not here");
-        exit;
-    }
-    
-	# Optional: if WS/WSS side is involved, reinforce connection aliasing
-	# Optional: reinforce aliasing only for WS/WSS traffic
-
-    # (Do NOT run for BYE or INFO without SDP)
-    if ((is_method("INVITE") || is_method("UPDATE")) && has_body("application/sdp")) {
-    	# Use offer here because it is a new SDP offer inside the dialog
-		# route(RTPENGINE_OFFER);i
-		rtpengine_use_set(1);	
-		rtpengine_manage();
-    }
-
-    # BYE: relay it, then clean RTPengine.
-    # Deleting before relay can work, but deleting after relay is safer operationally.
-    if (is_method("BYE")) {
-        if (!t_relay()) {
-            sl_reply_error();
-            exit;
-        }
-
-        rtpengine_use_set(1);
-        rtpengine_delete();
-
-        exit;
-    }
-
-	$var(WPC) = $(hdr(Via)[0]{via.transport}{s.tolower});
-	$var(WPD) = $(ru{uri.param,transport});
-    if ($var(WPD) == "ws" || $var(WPD) == "wss") {
-        xlog("L_INFO", "Client is WebSocket - Fixing Contact\n");
-        force_tcp_alias();
-    }
-
-    # Default: relay all other in-dialog requests
-    if (!t_relay()) {
-        sl_reply_error();
-    }
-    exit;
-}
-
 route[RELAY] {
 
-    if (is_method("INVITE")) {
+	# check if this request is a invite
+	
+	if (is_method("INVITE")) 
+	{
+		# for each branch we will call the function below
+		
 		t_on_branch("PER_BRANCH_OPS");
-        t_on_reply("HANDLE_NAT");
-        t_on_failure("MISSED_CALL");
 
-		# record_route();
+		# for each reply we will call the function below
+		
+		t_on_reply("HANDLE_NAT");
 
-        # --- Source transport detection ---
-        # Prefer $proto over Via parsing
-		$var(WPD) = $(ru{uri.param,transport});
-		$var(WPC) = $(hdr(Via)[0]{via.transport}{s.tolower});
+		# if the call was not completed, so failure route
+		t_on_failure("MISSED_CALL");
 
-		#	if ($socket_in(port) == 7443){
- 		#        $var(WPC) = "wss";
-		#	}
 
-        if ($var(WPC) == "ws" || $var(WPC) == "wss") {
-			xlog("L_INFO", "Client is WebSocket - Fixing Contact\n");
-            setflag("SRC_WS");
-    		setbflag("SRC_WS"); 
-			force_tcp_alias();
-	    	fix_nated_contact();
-        }
-		if ($var(WPD) == "ws" || $var(WPD) == "wss") {
-        	xlog("L_INFO", "Client is WebSocket - Fixing Contact\n");
-            setflag("DST_WS");
-            setbflag("DST_WS");
-        	#        force_tcp_alias();
-            fix_nated_contact();
-        } else if (nat_uac_test("private-contact,private-sdp,private-via,diff-ip-src-via,diff-port-src-via,diff-ip-src-contact,diff-port-src-contact")) {
-            fix_nated_contact();
-        }
+		if(nat_uac_test(127))
+		{
+			# user identified as behing a nat
+			#xlog("we are on route relay, user behind nat");
+			fix_nated_contact();
+		}
 
-		$var(callee_proto) = "";
+		# if we have an application/sdp on our body, so we execute
+                # the rtpproxy_offer
+		if(has_body("application/sdp"))
+		{
+			#xlog("we have sdp on this $rm");
+			# check if the RTP proxy was already selected or not
+			rtpproxy_offer("froc", "{{{public_ipv4}}}");
+		}
+	
+		if (lookup("location","m")) 
+		{
+			#xlog("request uri is now $ru");
+		}
+	}
 
-        # --- Destination transport detection ---
-        # After lookup(), $ru points to the selected contact.
-        if (lookup("location")) {
-            $var(callee_proto) = $(ru{uri.param,transport});
-        } else {
-            if ($du) {
-                $var(callee_proto) = $(du{uri.param,transport});
-                xlog("L_INFO", "Routing to Gateway/Outbound: $du\n");
-            } 
-	  #   else {
-           #     send_reply(404, "User Not Found");
-           #     exit;
-           # }
-        }
+	# removing the rtpproxy session
+	if(is_method("CANCEL|BYE"))
+	{
+		#xlog("L_NOTICE", "route sending BYE to other end..  info from: $fu, to: $tu");
+		rtpproxy_unforce();
+	}
 
-		if ($var(callee_proto) == "") {
-             if ($ru =~ "transport=ws" || $ru =~ "transport=wss") {
-                 $var(callee_proto) = "ws";
-             }
-        }
+    if (!t_relay()) 
+	{
+      send_reply(500,"Internal Error");
+    };
 
-        if ($var(callee_proto) == "ws" || $var(callee_proto) == "wss") {
-            setflag("DST_WS");
-			setbflag("DST_WS");
-            xlog("L_INFO", "Destination identified as WebSocket\n");
-        } else {
-        	#    resetflag("DST_WS");
-			#    resetbflag("DST_WS");
-            xlog("L_INFO", "Destination identified as Standard SIP\n");
-        }
-
-        # --- RTPengine offer on initial INVITE ---
-        if (has_body("application/sdp")) {
-            route(RTPENGINE_OFFER);
-        }
-    }
-
-    # Relay ALL methods (INVITE, BYE, ACK, UPDATE, INFO, etc.)
-    if (!t_relay()) {
-        sl_reply_error();
-    }
-
-    exit;
+	route(POST_CALL_PROC_ROUTE);
 }
-
 
 route[INTERNAL_MS_ROUTING] {
 	if ($hdr(X-LineBlocs-Key) != "{{{lineblocs_key}}}") { #internal asterisk
@@ -568,7 +456,6 @@ route[INTERNAL_MS_ROUTING] {
 		async(rest_post("{{{api_url}}}/call/setSIPCallID", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), MS_UPDATED_CALL_ID);
 		exit;
 	}
-
 	exit;
 }
 
@@ -635,14 +522,14 @@ route[INTERNAL_EXTENSION_ROUTING] {
 					async(rest_get("{{{api_url}}}/user/verifyCallerByDomain?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), VERIFY_CALLER_ROUTE);
 					exit;
 			} else if ($var(reqnum)=~"^[0-9]{1,5}$") { ## call to another end device
-				$var(query) = "username=" + $fu + "&domain=" + $fd + "&routerip=" +  $avp(G_PUBLIC_IP) + "&addr=" + $si;
+				$var(query) = "username=" + $fu + "&domain=" + $fd + "&routerip=" +  $socket_in(ip) + "&addr=" + $si;
 				$var(reg) = "/\+/%2B/g";
 
 				rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
 				async(rest_get("{{{api_url}}}/user/getUserAssignedIP?$(var(query){re.subst,$var(reg)})", $var(body), $var(ct), $var(rcode)), ENDPOINT_QUERY_ROUTE);
 				exit;	
 			} else if ($var(reqnum)=~"^\*[1-9]+") { ## media service call
-				$var(query) = "username=" + $fu + "&domain=" + $fd + "&routerip=" +  $avp(G_PUBLIC_IP) + "&addr=" + $si;
+				$var(query) = "username=" + $fu + "&domain=" + $fd + "&routerip=" +  $socket_in(ip) + "&addr=" + $si;
 				$var(reg) = "/\+/%2B/g";
 
 				rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
@@ -669,7 +556,7 @@ route[PSTN_ROUTING] {
 		route(RELAY);
 		exit;
 	} else {
-		$var(query) = "did=" + $tU + "&number=" + $fU + "&source=" + $si + "&routerip=" +  $avp(G_PUBLIC_IP) + "&addr=" + $si;
+		$var(query) = "did=" + $tU + "&number=" + $fU + "&source=" + $si + "&routerip=" +  $socket_in(ip) + "&addr=" + $si;
 		$var(reg) = "/\+/%2B/g";
 
 		rest_append_hf("X-Lineblocs-Carrier-Auth: {{{carrier_key}}}");
@@ -681,8 +568,8 @@ route[PSTN_ROUTING] {
 
 route[SIP_DEVICE_REGISTRATION] {
 	# check if its a hosted trunk or SIP device
-	# we can verify this by checking if the domain ends in pstn.lineblocs.com
-	if (pcre_match("$td", "pstn\.lineblocs.com")) {
+	# we can verify this by checking if the domain ends in pstn.{{{deployment_domain}}}
+	if (pcre_match("$td", "pstn\.{{{deployment_domain}}}")) {
 		xlog("L_INFO", "Hosted trunk was matched\n");
 		$var(query) = "domain=" + $fd + "&ip=" + $si + "&addr=" + $si + "&todomain=" + $td + "&fromuser=" + $fU + "&touser=" + $tU;
 		$var(reg) = "/\+/%2B/g";
@@ -699,7 +586,59 @@ route[SIP_DEVICE_REGISTRATION] {
 	}
 }
 
+route[RELAY_MS_TO_PSTN] {
 
+	# check if this request is a invite
+	append_hf("X-LineBlocs-Parent-Call-ID: $hdr(Call-ID)\r\n");
+	if (is_method("INVITE")) 
+	{
+		# for each branch we will call the function below
+		
+		t_on_branch("PER_BRANCH_OPS");
+
+		# for each reply we will call the function below
+		
+		t_on_reply("PSTN_HANDLE_NAT");
+
+		# if the call was not completed, so failure route
+		t_on_failure("PSTN_FAILURE");
+
+
+		if(nat_uac_test(127))
+		{
+			# user identified as behing a nat
+			#xlog("we are on route relay, user behind nat");
+			fix_nated_contact();
+		}
+
+		# if we have an application/sdp on our body, so we execute
+        # the rtpproxy_offer
+		if(has_body("application/sdp"))
+		{
+			#xlog("we have sdp on this $rm");
+			rtpproxy_offer("froc", "{{{public_ipv4}}}");
+		}
+	
+		if (lookup("location","m")) 
+		{
+			#xlog("request uri is now $ru");
+		}
+	}
+
+	# removing the rtpproxy session
+	if(is_method("CANCEL|BYE"))
+	{
+		#xlog("L_NOTICE", "route sending BYE to other end..  info from: $fu, to: $tu");
+		rtpproxy_unforce();
+	}
+
+	if (!t_relay()) 
+	{
+      		send_reply(500,"Internal Error");
+	};
+
+	route(POST_CALL_PROC_ROUTE);
+}
 
 route[BYE_QUERY_ROUTE] {
     $ru = "sip:" + $rU + "@" + $avp(value);
@@ -707,8 +646,7 @@ route[BYE_QUERY_ROUTE] {
 
 	if(is_method("CANCEL|BYE"))
 	{
-		#rtpproxy_unforce();
-		rtpengine_delete();
+		rtpproxy_unforce();
 	}
 
 	if (!t_relay()) 
@@ -716,7 +654,7 @@ route[BYE_QUERY_ROUTE] {
 		send_reply(500,"Internal Error");
 	};
 
-	#route(POST_CALL_PROC_ROUTE);
+	route(POST_CALL_PROC_ROUTE);
 }
 
 route[INCOMING_VALIDATION] {
@@ -724,7 +662,7 @@ route[INCOMING_VALIDATION] {
 	{
 		# lookup user SIP trunks next
 		xlog("SOURCE IP IS: $si");
-		$var(query) = "did=" + $tU + "&number=" + $fU + "&source=" + $si + "&routerip=" +  $avp(G_PUBLIC_IP) + "&addr=" + $si + "&fromdomain=" + $fd;
+		$var(query) = "did=" + $tU + "&number=" + $fU + "&source=" + $si + "&routerip=" +  $socket_in(ip) + "&addr=" + $si + "&fromdomain=" + $fd;
 		$var(reg) = "/\+/%2B/g";
 
 		rest_append_hf("X-Lineblocs-Carrier-Auth: {{{carrier_key}}}");
@@ -876,7 +814,7 @@ route[RTPPROXY_SELECTION] {
 
 	if ($var(rcode) != 200) 
 	{
-		send_reply(403, "Forbidden (scenario 1)");
+		send_reply(403, "Forbidden");
 		exit;
 	}
 
@@ -898,7 +836,7 @@ route[REGISTER] {
 
 	if ($var(rcode) != 204) 
 	{
-		send_reply(403, "Forbidden (scenario 2)");
+		send_reply(403, "Forbidden");
 		exit;
 	}
 
@@ -939,13 +877,13 @@ route[REGISTER_STORE] {
 
 	if ($var(rc) < 0) 
 	{
-		#send_reply(500, "Server Internal Error");
+		send_reply(500, "Server Internal Error");
 		exit;
 	}
 
 	if ($var(rcode) != 204) 
 	{
-		#send_reply(403, "Forbidden (scenario 3)");
+		send_reply(403, "Forbidden");
 		exit;
 	}
 
@@ -964,7 +902,7 @@ route[HOSTED_TRUNK_REGISTER] {
 
 	if ($var(rcode) != 204) 
 	{
-		send_reply(403, "Forbidden (scenario 4)");
+		send_reply(403, "Forbidden");
 		exit;
 	}
 
@@ -972,9 +910,9 @@ route[HOSTED_TRUNK_REGISTER] {
 	$var(auth_code) = www_authorize("", "subscriber");
 	if ($var(auth_code) == -1 || $var(auth_code) == -2) 
 	{
-		## uncomment to enable fail2ban
-		#xlog("L_NOTICE","REG Auth error for $fU@$fd from $si cause $var(auth_code)");
-		#exit;
+			## uncomment to enable fail2ban
+			#xlog("L_NOTICE","REG Auth error for $fU@$fd from $si cause $var(auth_code)");
+			#exit;
 	}
 
 	if ( $var(auth_code) < 0 ) 
@@ -1052,11 +990,8 @@ route[MS_PSTN_PROCESS_ROUTE] {
 
 	# initiate routing data...
 	$avp(body) = $(var(body));
-
-	xlog("received JSON data: $(var(body))\r\n");
 	$json(object) := $(avp(body));
 	$ru = "sip:" + $(json(object/did)) + "@" + $(json(object/ip_addr));
-	$avp(pstn_ru_addr) = $ru;
 	$var(body) = "ip="  + $(json(object/ip_addr)) +  "&apiid=" + $hdr(X-LineBlocs-API-CallId);
 	$var(reg) = "/\+/%2B/g";
 
@@ -1068,8 +1003,6 @@ route[MS_PSTN_PROCESS_ROUTE] {
 }
 
 route[MS_PSTN_AND_FINALIZE_ROUTING] {
-	xlog("AVP data from route: $avp(pstn_ru_addr)\r\n");
-
 	if ($var(rcode) != 200) 
 	{
 		send_reply(500, "Media server Routing Failed (scenario 3)");
@@ -1081,64 +1014,6 @@ route[MS_PSTN_AND_FINALIZE_ROUTING] {
 	exit;
 }
 
-route[RELAY_MS_TO_PSTN] {
-
-	$ru = $avp(pstn_ru_addr);
-	xlog("L_INFO", "Relaying call to carrier at IP: $ru\n");
-	# check if this request is a invite
-	append_hf("X-LineBlocs-Parent-Call-ID: $hdr(Call-ID)\r\n");
-	if (is_method("INVITE")) 
-	{
-		# for each branch we will call the function below
-		
-		t_on_branch("PER_BRANCH_OPS");
-
-		# for each reply we will call the function below
-		
-		t_on_reply("PSTN_HANDLE_NAT");
-
-		# if the call was not completed, so failure route
-		t_on_failure("PSTN_FAILURE");
-
-
-		if(nat_uac_test("private-contact,private-sdp,private-via,diff-ip-src-via,diff-port-src-via,diff-ip-src-contact,diff-port-src-contact"))
-		{
-			# user identified as behing a nat
-			#xlog("we are on route relay, user behind nat");
-			fix_nated_contact();
-		}
-
-		# if we have an application/sdp on our body, so we execute
-        # the rtpproxy_offer
-		if(has_body("application/sdp"))
-		{
-			#xlog("we have sdp on this $rm");
-			#rtpproxy_offer("froc", "{{{public_ipv4}}}");
-			route(RTPENGINE_OFFER);
-		}
-	
-		if (lookup("location")) 
-		{
-			#xlog("request uri is now $ru");
-		}
-	}
-
-	# removing the rtpproxy session
-	if(is_method("CANCEL|BYE"))
-	{
-		#xlog("L_NOTICE", "route sending BYE to other end..  info from: $fu, to: $tu");
-		#rtpproxy_unforce();
-		rtpengine_delete();
-	}
-
-	if (!t_relay()) 
-	{
-      		send_reply(500,"Internal Error");
-	};
-
-	#route(POST_CALL_PROC_ROUTE);
-}
-
 route[VERIFY_CALLER_ROUTE] {
 	xlog("verify caller result $rc\r\n");
 	if ($var(rcode) != 204) 
@@ -1148,12 +1023,12 @@ route[VERIFY_CALLER_ROUTE] {
 
 		rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
 		async(rest_post("{{{api_url}}}/debugger/createLogSimple", "$(var(body){re.subst,$var(reg)})", "application/x-www-form-urlencoded", $var(body), $var(ctype), $var(rcode)), VERIFY_FORBIDDEN);
-		send_reply(403, "Forbidden (scenario 5)");
+		send_reply(403, "Forbidden");
 		exit;
 	}
 
 	xlog("making call now..");
-	$var(query) = "username=" + $fu + "&domain=" + $fd + "&routerip=" +  $avp(G_PUBLIC_IP) + "&addr=" + $si;
+	$var(query) = "username=" + $fu + "&domain=" + $fd + "&routerip=" +  $socket_in(ip) + "&addr=" + $si;
 	$var(reg) = "/\+/%2B/g";
 
 	rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
@@ -1161,7 +1036,7 @@ route[VERIFY_CALLER_ROUTE] {
 }
 
 route[VERIFY_FORBIDDEN] {
-	send_reply(403, "Forbidden (scenario 6)");
+	send_reply(403, "Forbidden");
 	exit;
 }
 
@@ -1190,7 +1065,7 @@ route[PSTN_QUERY_ROUTE] {
 		# if the call was not completed, so failure route
 		t_on_failure("PSTN_FAILURE");
 
-		if(nat_uac_test("private-contact,private-sdp,private-via,diff-ip-src-via,diff-port-src-via,diff-ip-src-contact,diff-port-src-contact"))
+		if(nat_uac_test(127))
 		{
 			# user identified as behing a nat
 			#xlog("we are on route relay, user behind nat");
@@ -1202,8 +1077,7 @@ route[PSTN_QUERY_ROUTE] {
 		if(has_body("application/sdp"))
 		{
 			#xlog("we have sdp on this $rm");
-# 			rtpproxy_offer("froc", "{{{public_ipv4}}}");
-			route(RTPENGINE_OFFER);
+			rtpproxy_offer("froc", "{{{public_ipv4}}}");
 		}
 	
 	}
@@ -1211,8 +1085,7 @@ route[PSTN_QUERY_ROUTE] {
 	# removing the rtpproxy session
 	if(is_method("CANCEL|BYE"))
 	{
-		#rtpproxy_unforce();
-		rtpengine_delete();
+		rtpproxy_unforce();
 	}
 
 	if (!t_relay()) 
@@ -1220,7 +1093,7 @@ route[PSTN_QUERY_ROUTE] {
 		send_reply(500,"Internal Error");
 	};
 
-	#route(POST_CALL_PROC_ROUTE);
+	route(POST_CALL_PROC_ROUTE);
 }
 
 route[MEDIASERVICE_QUERY_ROUTE] {
@@ -1240,7 +1113,7 @@ route[MEDIASERVICE_QUERY_ROUTE] {
 		# if the call was not completed, so failure route
 		t_on_failure("MISSED_CALL");
 
-		if(nat_uac_test("private-contact,private-sdp,private-via,diff-ip-src-via,diff-port-src-via,diff-ip-src-contact,diff-port-src-contact"))
+		if(nat_uac_test(127))
 		{
 			# user identified as behing a nat
 			fix_nated_contact();
@@ -1250,16 +1123,14 @@ route[MEDIASERVICE_QUERY_ROUTE] {
 		# the rtpproxy_offer
 		if(has_body("application/sdp"))
 		{
-			#rtpproxy_offer("froc", "{{{public_ipv4}}}");
-			route(RTPENGINE_OFFER);
+			rtpproxy_offer("froc", "{{{public_ipv4}}}");
 		}
 	}
 
 	# removing the rtpproxy session
 	if(is_method("CANCEL|BYE"))
 	{
-		#rtpproxy_unforce();
-		rtpengine_delete();
+		rtpproxy_unforce();
 	}
 
 	if (!t_relay()) 
@@ -1267,7 +1138,7 @@ route[MEDIASERVICE_QUERY_ROUTE] {
 		send_reply(500,"Internal Error");
 	};
 
-	#route(POST_CALL_PROC_ROUTE);
+	route(POST_CALL_PROC_ROUTE);
 }
 
 route[ENDPOINT_QUERY_ROUTE] {
@@ -1288,7 +1159,7 @@ route[ENDPOINT_QUERY_ROUTE] {
 		# if the call was not completed, so failure route
 		t_on_failure("MISSED_CALL");
 
-		if(nat_uac_test("private-contact,private-sdp,private-via,diff-ip-src-via,diff-port-src-via,diff-ip-src-contact,diff-port-src-contact"))
+		if(nat_uac_test(127))
 		{
 			# user identified as behing a nat
 			fix_nated_contact();
@@ -1298,16 +1169,14 @@ route[ENDPOINT_QUERY_ROUTE] {
 		# the rtpproxy_offer
 		if(has_body("application/sdp"))
 		{
-			#rtpproxy_offer("froc", "{{{public_ipv4}}}");
-			route(RTPENGINE_OFFER);
+			rtpproxy_offer("froc", "{{{public_ipv4}}}");
 		}
 	}
 
 	# removing the rtpproxy session
 	if(is_method("CANCEL|BYE"))
 	{
-		#rtpproxy_unforce();
-		rtpengine_delete();
+		rtpproxy_unforce();
 	}
 
 	if (!t_relay()) 
@@ -1316,7 +1185,7 @@ route[ENDPOINT_QUERY_ROUTE] {
 	};
 
 
-	#route(POST_CALL_PROC_ROUTE);
+	route(POST_CALL_PROC_ROUTE);
 }
 
 branch_route[PER_BRANCH_OPS] {
@@ -1329,20 +1198,17 @@ onreply_route[HANDLE_NAT] {
 
 	# we receive a reply, we need to check about application/sdp 
 	# on our body, if we have, we answer that
-	if(has_body("application/sdp"))
+	if(is_method("ACK") && has_body("application/sdp"))
 	{
-		# rtpproxy_answer("froc", "{{{public_ipv4}}}");
+		rtpproxy_answer("froc", "{{{public_ipv4}}}");
+	} else if(has_body("application/sdp")) {
 		# offering rtpproxy on a non ack message
-		# rtpproxy_offer("froc", "{{{public_ipv4}}}");	
-		if (t_check_status("18[0-3]|2[0-9][0-9]")){
-			route(RTPENGINE_ANSWER);
-			#rtpengine_manage();
-		}
+		rtpproxy_offer("froc", "{{{public_ipv4}}}");	
 	}
 
 	# here we try to identify if the user is behind a nat again
 	# but now is the second user (the called user) 
-	if(nat_uac_test("private-contact,private-sdp,private-via,diff-ip-src-via,diff-port-src-via,diff-ip-src-contact,diff-port-src-contact"))
+	if(nat_uac_test(127))
 	{
 		fix_nated_contact();
 	}
@@ -1355,30 +1221,21 @@ onreply_route[PSTN_HANDLE_NAT] {
 	# we receive a reply, we need to check about application/sdp 
 	# on our body, if we have, we answer that
 
-	# if(is_method("ACK") && has_body("application/sdp"))
-
-	if ($ct =~ "invalid" || $ct =~ "transport=ws") {
-	# if(nat_uac_test("private-contact,private-sdp,private-via,diff-ip-src-via,diff-port-src-via,diff-ip-src-contact,diff-port-src-contact"))
-	#  {
-                fix_nated_contact();
-        }
-
-	
-	if (has_body("application/sdp") && nat_uac_test("private-sdp"))
+	if(is_method("ACK") && has_body("application/sdp"))
 	{
-		fix_nated_sdp("rewrite-origin-ip");
-	}
-
-	if(is_method("ACK") && has_body("application/sdp")){
-		# rtpproxy_answer("froc", "{{{public_ipv4}}}");
-		route(RTPENGINE_ANSWER);
+		rtpproxy_answer("froc", "{{{public_ipv4}}}");
 	} else if(has_body("application/sdp")) {
 		# offering rtpproxy on a non ack message
-		# rtpproxy_offer("froc", "{{{public_ipv4}}}");	
-		route(RTPENGINE_OFFER);
+		rtpproxy_offer("froc", "{{{public_ipv4}}}");	
 	}
+
 	# here we try to identify if the user is behind a nat again
 	# but now is the second user (the called user) 
+	if(nat_uac_test(127))
+	{
+		fix_nated_contact();
+	}
+
 	# update SIP details
 	$var(body) = "requestto=" + $ru + "&user=" + $fU + "&domain=" + $fd + "&callid=" + $hdr(Call-ID) + "&status=" + $rs;
 	$var(reg) = "/\+/%2B/g";
@@ -1412,7 +1269,7 @@ route[RELAY_TO_USER_TRUNK] {
 		# if the call was not completed, so failure route
 		t_on_failure("PSTN_FAILURE");
 
-		if(nat_uac_test("private-contact,private-sdp,private-via,diff-ip-src-via,diff-port-src-via,diff-ip-src-contact,diff-port-src-contact"))
+		if(nat_uac_test(127))
 		{
 			# user identified as behing a nat
 			#xlog("we are on route relay, user behind nat");
@@ -1424,15 +1281,14 @@ route[RELAY_TO_USER_TRUNK] {
 		if(has_body("application/sdp"))
 		{
 			#xlog("we have sdp on this $rm");
-# 			rtpproxy_offer("froc", "{{{public_ipv4}}}");
-			route(RTPENGINE_OFFER);
+			rtpproxy_offer("froc", "{{{public_ipv4}}}");
 		}
 	}
 
 	# removing the rtpproxy session
 	if(is_method("CANCEL|BYE"))
 	{
-		rtpengine_delete();
+		rtpproxy_unforce();
 	}
 
 	if (!t_relay()) 
@@ -1440,7 +1296,7 @@ route[RELAY_TO_USER_TRUNK] {
  		send_reply(500,"Internal Error");
 	};
 
-	#route(POST_CALL_PROC_ROUTE);
+	route(POST_CALL_PROC_ROUTE);
 }
 
 failure_route[PSTN_FAILURE] {
@@ -1482,8 +1338,6 @@ route[CAPTURE_HEP_ROUTE] {
 
 route[POST_CALL_PROC_ROUTE] {
 	xlog("POST_CALL_PROC_ROUTE was triggered");
-	rtpengine_use_set(1);	
-	
 	if(is_method("INVITE")) {
 		xlog("POST_CALL_PROC_ROUTE handling INVITE event");
 		$var(query) = "invite_ip=" + $ru;
@@ -1522,66 +1376,4 @@ route[INVITE_REPORT_ROUTE] {
 route[BYE_REPORT_ROUTE] {
 	xlog("BYE_REPORT_ROUTE callback triggered");
 	exit;
-}
-
-route[RTPENGINE_OFFER] {
-    $var(rtp_flags) = "";
-
-    #
-    # OFFER goes in the direction of the request being forwarded:
-    # - If the *destination* is WebRTC -> we must produce SAVPF/DTLS/ICE toward it
-    # - Else (destination is SIP) -> produce RTP/AVP toward it
-    #
-
-    if (isbflagset("DST_WS")) {
-        # Anything -> WebRTC destination
-        $var(rtp_flags) = "rtcp-mux-offer generate-mid DTLS=passive SDES-off ICE=force UDP/TLS/RTP/SAVPF";
-    } else {
-        # Anything -> SIP destination
-        # Keep SIP side clean: no mux, no DTLS, no ICE
-        $var(rtp_flags) = "DTLS=off SDES-off ICE=remove RTP/AVP";
-        # Only keep SIP-source-address if you truly need it
-        $var(rtp_flags) = $var(rtp_flags) + " SIP-source-address";
-    }
-
-    # Always pin the public media address
-    $var(rtp_flags) = $var(rtp_flags) + " media-address=" + $avp(G_PUBLIC_IP);
-
-    # Common flags
-    $var(rtp_flags) = "replace-origin replace-session-connection " + $var(rtp_flags);
-
-    rtpengine_use_set(1);
-    xlog("L_INFO", "RTP OFFER Flags: $var(rtp_flags)\n");
-    rtpengine_offer("$var(rtp_flags)");
-}
-
-
-route[RTPENGINE_ANSWER] {
-    $var(ans_flags) = "";
-
-    #
-    # ANSWER is generated for the direction back to the original caller:
-    # - If the *source/original caller* is WebRTC -> answer must be WebRTC compatible
-    # - Else -> answer must be SIP compatible
-    #
-
-    if (isflagset("SRC_WS")) {
-        # Reply back to WebRTC caller
-        # Force mux and ICE; DTLS passive is correct for most deployments
-        $var(ans_flags) = "rtcp-mux-require generate-mid DTLS=passive SDES-off ICE=force UDP/TLS/RTP/SAVPF";
-    } else {
-        # Reply back to SIP caller
-        $var(ans_flags) = "DTLS=off SDES-off ICE=remove RTP/AVP";
-        $var(ans_flags) = $var(ans_flags) + " SIP-source-address";
-    }
-
-    # Always pin the public media address
-    $var(ans_flags) = $var(ans_flags) + " media-address=" + $avp(G_PUBLIC_IP);
-
-    # Common flags
-    $var(ans_flags) = "replace-origin replace-session-connection " + $var(ans_flags);
-
-    rtpengine_use_set(1);
-    xlog("L_INFO", "RTP Answer Flags: $var(ans_flags)\n");
-    rtpengine_answer("$var(ans_flags)");
 }
