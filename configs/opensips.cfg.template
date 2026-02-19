@@ -248,7 +248,7 @@ loadmodule "regex.so"
 # main request routing logic
 route{
 	$avp(G_PUBLIC_IP) = "{{{public_ipv4}}}";
-	$avp(API_URL) = "{{{api_url}}}";
+	$avp(G_API_URL) = "{{{api_url}}}";
 	$var(WPC) = $(hdr(Via)[0]{via.transport}{s.tolower});
 
     if ($var(WPC) == "ws" || $var(WPC) == "wss"){
@@ -816,6 +816,7 @@ route[DID_ASSIGNED] {
 	}
 
 	$ru = "sip:" + $rU + "@" + $var(body);
+	$avp(ms_ru_addr) = $ru;
 	rest_append_hf("X-Lineblocs-Carrier-Auth: {{{carrier_key}}}");
 	rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
 	$var(query) = "did=" + $tU + "&addr=" + $si;
@@ -848,6 +849,9 @@ route[CALL_ACTION] {
 	}
 
 	append_hf("X-LineBlocs-Key: {{{lineblocs_key}}}\r\n");
+
+	xlog("AVP data from route: $avp(ms_ru_addr)\r\n");
+	$ru = $avp(ms_ru_addr);
 	switch($var(body))
 	{
 		case "accept-call":
@@ -855,8 +859,7 @@ route[CALL_ACTION] {
 			append_hf("X-LineBlocs-Accept-Call-Type: voice\r\n");
 			append_hf("X-LineBlocs-Direction: incoming-proxy\r\n");
 			rest_append_hf("X-Lineblocs-Api-Token: {{{lineblocs_key}}}");
-			async(rest_get("{{{api_url}}}/getBestRTPProxy", $var(body), $var(ct), $var(rcode)), RTPPROXY_SELECTION);
-			#route(RELAY);
+			route(RELAY);
 		break;
 		case "accept-fax":
 			log("accept-fax action is set..");
