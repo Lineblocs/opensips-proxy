@@ -4,22 +4,21 @@ if [ "$CLOUD" != "" ]; then
    PROVIDER="-provider ${CLOUD}"
 fi
 
-# NOTE: variables below which are exported are used in envsubst and probably not defined beforehand. If you wish to pass
-# another one, TLS_ENABLED for example, and it has not been defined before in the docker run command, you need to export
-# it to make it available in subcommands (ie. envsubst).
+# --- NEW: Setup Logging Permissions ---
+usermod -a -G tty syslog
+service rsyslog start
+cron
+# --------------------------------------
 
 APP="sampo"
 export PRIVATE_IPV4=$(netdiscover -field privatev4 ${PROVIDER})
 export PUBLIC_IPV4=$(netdiscover -field publicv4 ${PROVIDER})
 export ADVERTIZED_IPV4="${PUBLIC_IPV4:-0.0.0.0}"
 
-# change variables for cloud providers that use NAT. e.g AWS
 if [ "$CLOUD" = "aws" ]; then
-   #PUBLIC_IPV4="${PRIVATE_IPV4:-127.0.0.1}"
    PUBLIC_IPV4="0.0.0.0"
 fi
 
-# todo add https support
 API_SCHEME="http"
 DEPLOYMENT_DOMAIN="${DEPLOYMENT_DOMAIN:-example.org}"
 export LINEBLOCS_KEY="${LINEBLOCS_KEY:-123xyz}"
@@ -38,7 +37,6 @@ echo "API URL: ${API_URL}"
 CFG_PATH="/etc/opensips/opensips.cfg"
 
 if [[ -z "${RTPPROXY_IPV4}" ]]; then
-   #RTPPROXY_IPV4=${PUBLIC_IPV4}
    export RTPPROXY_IPV4="127.0.0.1"
 fi
 
@@ -48,28 +46,18 @@ export DB_HOST="${DB_HOST:-empty}"
 export DB_NAME="${DB_NAME:-empty}"
 export DB_OPENSIPS="${DB_OPENSIPS:-empty}"
 
-
-#cp $CFG_PATH $CFG_PATH.temp
-#envsubst '$PRIVATE_IPV4 $PUBLIC_IPV4 $RTPPROXY_IPV4 $DB_USER $DB_PASS $DB_HOST $DB_NAME $DB_OPENSIPS $DB_USER $API_URL $LINEBLOCS_KEY $DEPLOYMENT_DOMAIN' < $CFG_PATH.temp > $CFG_PATH
-# make database modifications with Python scripts
 echo "Adding OpenSIPs customization parameters (this may take some time)"
 ./create_opensips_cfg
 
 rm -rf $CFG_PATH.temp
 
-# echo "Final opensips.cfg contents are"
-# cat $CFG_PATH
-# echo ""
-
-## debugging only
-#tail -f /etc/*-release
-
 OPENSIPS_ARGS="-F -m 512"
+
 # run sampo API server in background
 echo "Starting sampo API server"
 socat -d TCP-LISTEN:1042,reuseaddr,fork,pf=ip4 \
                     exec:/${APP}/${APP}.sh &
 
-
 # start opensips server
+# Note: Ensure log_facility = LOG_LOCAL0; is in opensips.cfg
 /usr/sbin/opensips ${OPENSIPS_ARGS}
