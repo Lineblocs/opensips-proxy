@@ -44,6 +44,7 @@ timer_workers = 2 use_auto_scaling_profile PROFILE_TIMER
 
 # UDP support
 socket=udp:0.0.0.0:5060
+socket=tcp:0.0.0.0:5065
 socket=wss:0.0.0.0:7443
 #listen=udp:0.0.0.0:5060
 
@@ -207,8 +208,8 @@ loadmodule "proto_udp.so"
 modparam("proto_udp", "udp_port", 5060)
 
 ## TCP protocol
-#loadmodule "proto_tcp.so"
-#modparam("proto_tcp", "tcp_port", 5065)
+loadmodule "proto_tcp.so"
+modparam("proto_tcp", "tcp_port", 5065)
 
 
 ## TCP protocol
