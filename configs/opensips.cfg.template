@@ -627,7 +627,7 @@ route[INTERNAL_EXTENSION_ROUTING] {
 		if($var(reqnum) =~ "[0-9]{1,}") 
 		{
 			## call to PSTN
-			if ($var(reqnum)=~"^\+[0-9]{9,}") 
+			if ($var(reqnum)=~"^\+?[0-9]{9,}") 
 			{
 					$var(query) = "number=" + $var(tonum) + "&domain=" + $fd + "&addr=" + $si;
 					$var(reg) = "/\+/%2B/g";
