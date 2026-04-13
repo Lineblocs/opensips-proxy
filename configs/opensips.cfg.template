@@ -426,7 +426,7 @@ route[AS_SERVICE] {
     $var(key)    = "/etc/opensips/tls/vs/key.pem";    # Local Path to Private Key
     
     # The X5U is the URL where the CALLEE can download your public cert
-    $var(x5u)    = "https://your-public-url.com/cert.pem"; 
+    $var(x5u)    = "https://{{{deployment_domain}}}/stir-shaken/cert.pem"; 
 
     # 2. Call the function with correct parameter order:
     # stir_shaken_auth(attest, origid, cert, pkey, x5u)
@@ -711,7 +711,7 @@ route[INTERNAL_EXTENSION_ROUTING] {
 
 route[PSTN_ROUTING] {
 	xlog("SOURCE IP IS: $si");
-	
+
 	# STIR/SHAKEN verification
 	# route(VS_SERVICE);
 	if ($hdr(X-LineBlocs-RingSubscriber) == "true")
