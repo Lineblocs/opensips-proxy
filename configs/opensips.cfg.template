@@ -711,6 +711,9 @@ route[INTERNAL_EXTENSION_ROUTING] {
 
 route[PSTN_ROUTING] {
 	xlog("SOURCE IP IS: $si");
+	
+	# STIR/SHAKEN verification
+	# route(VS_SERVICE);
 	if ($hdr(X-LineBlocs-RingSubscriber) == "true")
 	{
 		xlog("sending to extension...\r\n");
