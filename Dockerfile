@@ -23,7 +23,7 @@ RUN curl -o /usr/share/keyrings/opensips-org.gpg https://apt.opensips.org/opensi
 # 3. Install OpenSIPS & Modules
 RUN apt-get -y update -qq && apt-get -y install opensips opensips-mysql-module \
     opensips-regex-module opensips-restclient-module opensips-http-modules \
-    opensips-json-module opensips-tls-module opensips-auth-modules opensips-wss-module make && \
+    opensips-json-module opensips-tls-module opensips-auth-modules opensips-wss-module opensips-stir-shaken-module make && \
     rm -rf /var/lib/apt/lists/*
 
 # 4. Setup Dual Logging Routing (rsyslog)

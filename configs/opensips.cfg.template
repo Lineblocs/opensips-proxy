@@ -419,26 +419,41 @@ route{
 }
 
 route[AS_SERVICE] {
-    # Parameters: Cert Path, Private Key Path, Attestation Level, Orig-ID
-    $var(cert) = "/etc/opensips/tls/vs/cert.pem";
-    $var(key) = "/etc/opensips/tls/vs/key.pem";
+    # 1. Define your parameters
+    $var(attest) = "A";                               # Attestation Level (A, B, or C)
+    $var(origid) = "your-orig-uuid";                  # Your UUID/Originating ID
+    $var(cert)   = "/etc/opensips/tls/vs/cert.pem";   # Local Path to Public Cert
+    $var(key)    = "/etc/opensips/tls/vs/key.pem";    # Local Path to Private Key
     
-    # Attestation levels: A (Full), B (Partial), C (Gateway)
-    if (!stir_shaken_auth("A", $var(cert), $var(key), "your-orig-uuid")) {
-        xlog("L_ERR", "STIR/SHAKEN signing failed!\n");
+    # The X5U is the URL where the CALLEE can download your public cert
+    $var(x5u)    = "https://your-public-url.com/cert.pem"; 
+
+    # 2. Call the function with correct parameter order:
+    # stir_shaken_auth(attest, origid, cert, pkey, x5u)
+    if (!stir_shaken_auth($var(attest), $var(origid), $var(cert), $var(key), $var(x5u))) {
+        xlog("L_ERR", "STIR/SHAKEN signing failed with error code $rc!\n");
+        # Optional: You may want to exit or send a reply if signing is mandatory
+    } else {
+        xlog("L_INFO", "STIR/SHAKEN Identity header successfully generated\n");
     }
 }
 
 route[VS_SERVICE] {
     if (is_present_hf("Identity")) {
-        # Verifies the Identity header against the provided CA list
-        if (stir_shaken_verify()) {
+        # 1. Provide the variable names directly (no quotes)
+        # OpenSIPS will populate these variables automatically on call
+        if (stir_shaken_verify($var(cert_out), $var(err_code), $var(err_reason))) {
             xlog("L_INFO", "STIR/SHAKEN Verification Successful - Identity Verified\n");
         } else {
-            xlog("L_WARN", "STIR/SHAKEN Verification Failed - Code: $rc\n");
-            # Optional: Reject the call or add a 'verstat' parameter to the From header
-            # send_reply(438, "Invalid Identity Header");
-            # exit;
+            # 2. Now you can use them as normal with the $ prefix
+            xlog("L_WARN", "STIR/SHAKEN Verification Failed - Code: $var(err_code) Reason: $var(err_reason)\n");
+            
+            if ($var(err_code) == "-4") {
+                send_reply(438, "Stale Identity Header");
+            } else {
+                send_reply(438, "Invalid Identity Header");
+            }
+            exit;
         }
     } else {
         xlog("L_INFO", "No Identity header present to verify\n");
