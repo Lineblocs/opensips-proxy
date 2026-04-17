@@ -189,6 +189,11 @@ loadmodule "rtpengine.so"
 modparam("rtpengine", "db_url", "mysql://{{{db_user}}}:{{{db_pass}}}@{{{db_host}}}/{{{db_opensips}}}")
 #modparam("rtpengine", "rtpengine_sock", "udp:127.0.0.1:2223")
 
+loadmodule "stir_shaken.so"
+# Path to your signing certificate (Public Key)
+modparam("stir_shaken", "ca_list", "/etc/opensips/tls/vs/ca_bundle.crt")
+
+
 loadmodule "uac.so"
 
 #### ACCounting module
@@ -411,6 +416,48 @@ route{
 	}
 
 	route(RELAY);
+}
+
+route[AS_SERVICE] {
+    # 1. Define your parameters
+    $var(attest) = "A";                               # Attestation Level (A, B, or C)
+    $var(origid) = "your-orig-uuid";                  # Your UUID/Originating ID
+    $var(cert)   = "/etc/opensips/tls/vs/cert.pem";   # Local Path to Public Cert
+    $var(key)    = "/etc/opensips/tls/vs/key.pem";    # Local Path to Private Key
+    
+    # The X5U is the URL where the CALLEE can download your public cert
+    $var(x5u)    = "https://{{{deployment_domain}}}/stir-shaken/cert.pem"; 
+
+    # 2. Call the function with correct parameter order:
+    # stir_shaken_auth(attest, origid, cert, pkey, x5u)
+    if (!stir_shaken_auth($var(attest), $var(origid), $var(cert), $var(key), $var(x5u))) {
+        xlog("L_ERR", "STIR/SHAKEN signing failed with error code $rc!\n");
+        # Optional: You may want to exit or send a reply if signing is mandatory
+    } else {
+        xlog("L_INFO", "STIR/SHAKEN Identity header successfully generated\n");
+    }
+}
+
+route[VS_SERVICE] {
+    if (is_present_hf("Identity")) {
+        # 1. Provide the variable names directly (no quotes)
+        # OpenSIPS will populate these variables automatically on call
+        if (stir_shaken_verify($var(cert_out), $var(err_code), $var(err_reason))) {
+            xlog("L_INFO", "STIR/SHAKEN Verification Successful - Identity Verified\n");
+        } else {
+            # 2. Now you can use them as normal with the $ prefix
+            xlog("L_WARN", "STIR/SHAKEN Verification Failed - Code: $var(err_code) Reason: $var(err_reason)\n");
+            
+            if ($var(err_code) == "-4") {
+                send_reply(438, "Stale Identity Header");
+            } else {
+                send_reply(438, "Invalid Identity Header");
+            }
+            exit;
+        }
+    } else {
+        xlog("L_INFO", "No Identity header present to verify\n");
+    }
 }
 
 route[WITHINDLG] {
@@ -664,6 +711,9 @@ route[INTERNAL_EXTENSION_ROUTING] {
 
 route[PSTN_ROUTING] {
 	xlog("SOURCE IP IS: $si");
+
+	# STIR/SHAKEN verification
+	# route(VS_SERVICE);
 	if ($hdr(X-LineBlocs-RingSubscriber) == "true")
 	{
 		xlog("sending to extension...\r\n");
@@ -812,7 +862,7 @@ route[INCOMING_VALIDATION_2] {
 route[DID_ASSIGNED] {
 	if ($var(rcode) != 200) 
 	{
-		send_reply(400, "Bad Request -- DID lookup failed");
+		send_reply(400, "Bad Request (scenario 1)");
 		exit;
 	}
 
@@ -828,7 +878,7 @@ route[DID_ASSIGNED] {
 route[TRUNK_ASSIGNED] {
 	if ($var(rcode) != 200) 
 	{
-		send_reply(400, "Bad Request");
+		send_reply(400, "Bad Request (scenario 2)");
 		exit;
 	}
 
@@ -845,7 +895,7 @@ route[TRUNK_ASSIGNED] {
 route[CALL_ACTION] {
 	if ($var(rcode) != 200) 
 	{
-		send_reply(400, "Bad Request");
+		send_reply(400, "Bad Request (scenario 3)");
 		exit;
 	}
 
