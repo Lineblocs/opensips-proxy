@@ -862,7 +862,7 @@ route[INCOMING_VALIDATION_2] {
 route[DID_ASSIGNED] {
 	if ($var(rcode) != 200) 
 	{
-		send_reply(400, "Bad Request -- DID lookup failed");
+		send_reply(400, "Bad Request (scenario 1)");
 		exit;
 	}
 
@@ -878,7 +878,7 @@ route[DID_ASSIGNED] {
 route[TRUNK_ASSIGNED] {
 	if ($var(rcode) != 200) 
 	{
-		send_reply(400, "Bad Request");
+		send_reply(400, "Bad Request (scenario 2)");
 		exit;
 	}
 
@@ -895,7 +895,7 @@ route[TRUNK_ASSIGNED] {
 route[CALL_ACTION] {
 	if ($var(rcode) != 200) 
 	{
-		send_reply(400, "Bad Request");
+		send_reply(400, "Bad Request (scenario 3)");
 		exit;
 	}
 
